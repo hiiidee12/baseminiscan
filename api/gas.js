@@ -11,10 +11,6 @@ const PRICE_URLS = [
   "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
 ];
 
-function toHex(n) {
-  return "0x" + BigInt(n).toString(16);
-}
-
 function hexToBigInt(hex) {
   if (!hex) return 0n;
   return BigInt(hex);
@@ -53,7 +49,7 @@ async function rpcTry(method, params = []) {
 async function fetchEthUsd() {
   for (const u of PRICE_URLS) {
     try {
-      const r = await fetch(u, { headers: { "accept": "application/json" } });
+      const r = await fetch(u, { headers: { accept: "application/json" } });
       const j = await r.json();
 
       const coinbase = Number(j?.data?.amount);
@@ -61,15 +57,20 @@ async function fetchEthUsd() {
 
       const cg = Number(j?.ethereum?.usd);
       if (Number.isFinite(cg) && cg > 0) return cg;
-    } catch (e) {
-      // ignore
-    }
+    } catch (_) {}
   }
   return null;
 }
 
+function gasUsd(gwei, gasLimit, ethUsd) {
+  if (!ethUsd) return null;
+  const eth = (gwei * 1e-9) * gasLimit;
+  const usd = eth * ethUsd;
+  return Number.isFinite(usd) ? usd : null;
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (req.method !== "GET") {
     res.status(405).end();
     return;
   }
@@ -78,7 +79,9 @@ export default async function handler(req, res) {
     const { result: gasPriceHex } = await rpcTry("eth_gasPrice");
     const gasWei = hexToBigInt(gasPriceHex);
     const gasGwei = weiToGweiNumber(gasWei);
-    if (!Number.isFinite(gasGwei)) throw new Error("Invalid gas price from RPC");
+    if (!Number.isFinite(gasGwei)) {
+      throw new Error("Invalid gas price from RPC");
+    }
 
     const { result: block } = await rpcTry("eth_getBlockByNumber", ["latest", false]);
 
@@ -87,9 +90,9 @@ export default async function handler(req, res) {
     const gasLimit = block?.gasLimit ? hexToBigInt(block.gasLimit) : null;
 
     let gasUsedRatio = null;
-    if (gasUsed !== null && gasLimit !== null && gasLimit > 0n) {
+    if (gasUsed && gasLimit && gasLimit > 0n) {
       const ratio = Number(gasUsed) / Number(gasLimit);
-      if (Number.isFinite(ratio) && ratio >= 0) gasUsedRatio = ratio.toFixed(6);
+      if (Number.isFinite(ratio)) gasUsedRatio = ratio.toFixed(6);
     }
 
     const safe = gasGwei;
@@ -97,6 +100,21 @@ export default async function handler(req, res) {
     const rapid = gasGwei * 1.25;
 
     const ethUsd = await fetchEthUsd();
+
+    const estimates = {
+      erc20: {
+        gasLimit: 50000,
+        safeUsd: gasUsd(safe, 50000, ethUsd),
+        fastUsd: gasUsd(fast, 50000, ethUsd),
+        rapidUsd: gasUsd(rapid, 50000, ethUsd),
+      },
+      swap: {
+        gasLimit: 120000,
+        safeUsd: gasUsd(safe, 120000, ethUsd),
+        fastUsd: gasUsd(fast, 120000, ethUsd),
+        rapidUsd: gasUsd(rapid, 120000, ethUsd),
+      },
+    };
 
     res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=30");
     res.status(200).json({
@@ -107,6 +125,7 @@ export default async function handler(req, res) {
       lastBlock,
       gasUsedRatio,
       ethUsd,
+      estimates,
       source: "base-rpc",
     });
   } catch (e) {
