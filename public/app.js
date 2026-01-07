@@ -340,7 +340,7 @@ function renderGas(g, nextSec) {
   `;
 }
 
-async function loadGasOnce(nextSec = 10) {
+async function loadGasOnce(nextSec = 60) {
   $("output").innerHTML = `<div class="muted">Loading gas…</div>`;
   try {
     const r = await fetch("/api/gas", { cache: "no-store" });
@@ -384,7 +384,7 @@ function startGasAutoRefresh() {
     next -= 1;
 
     if (next <= 0) {
-      next = 10;
+      next = 60;
       await loadGasOnce(next);
     } else {
       const b = document.querySelector(".gasNext b");
