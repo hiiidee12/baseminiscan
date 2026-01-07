@@ -7,11 +7,11 @@
   "frame": {
     "name": "Base Mini Scan",
     "version": "1",
-    "splashImageUrl": "https://baseminiscan.vercel.app/assets/card.png",
-    "splashBackgroundColor": "#020617",
     "iconUrl": "https://baseminiscan.vercel.app/assets/icon.png",
     "homeUrl": "https://baseminiscan.vercel.app/",
     "imageUrl": "https://baseminiscan.vercel.app/assets/card.png",
+    "splashImageUrl": "https://baseminiscan.vercel.app/assets/card.png",
+    "splashBackgroundColor": "#020617",
     "subtitle": "Base explorer helper",
     "description": "Quick lookup on BaseScan for addresses, transactions, and blocks.",
     "primaryCategory": "utility",
