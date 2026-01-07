@@ -1,358 +1,332 @@
-html, body{
-  height:100%;
-  margin:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-  color:#fff;
+* {
+  box-sizing: border-box;
 }
 
-body{
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: #fff;
+}
+
+body {
   background:
     radial-gradient(900px 500px at 10% 10%, rgba(0,112,255,.55), transparent 40%),
     radial-gradient(800px 500px at 90% 20%, rgba(80,160,255,.45), transparent 45%),
     linear-gradient(180deg, #020617, #020b2a, #041e42);
+  background-size: 200% 200%;
+  animation: bgMove 18s ease-in-out infinite;
 }
 
-.wrap{
-  min-height:100dvh;
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-  padding:16px;
+@keyframes bgMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
-.card{
-  width:100%;
-  max-width:720px;
-  background:linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08));
-  backdrop-filter:blur(32px) saturate(180%);
-  -webkit-backdrop-filter:blur(32px) saturate(180%);
-  border-radius:26px;
-  border:1px solid rgba(255,255,255,0.35);
-  padding:22px;
-  box-shadow:0 30px 80px rgba(0,60,180,.45), inset 0 1px 0 rgba(255,255,255,.45);
+.wrap {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
 }
 
-h1{
-  font-size:22px;
-  margin:0 0 12px;
-  letter-spacing:.4px;
-}
-
-.row{ display:grid; gap:14px; }
-
-input{
-  padding:15px 16px;
-  border-radius:18px;
-  background:rgba(255,255,255,0.28);
-  border:1px solid rgba(255,255,255,0.4);
-  color:#fff;
-  font-size:14px;
-  outline:none;
-  backdrop-filter:blur(16px);
-}
-
-input::placeholder{ color:rgba(255,255,255,.65); }
-
-button{
-  padding:15px 16px;
-  border-radius:20px;
-  border:none;
-  font-size:15px;
-  font-weight:600;
-  color:#fff;
-  cursor:pointer;
-  background:linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
-  box-shadow:0 14px 40px rgba(37,99,235,.65), inset 0 1px 0 rgba(255,255,255,.35);
-}
-
-button.secondary{
-  background:rgba(255,255,255,0.25);
-  box-shadow:none;
-  border:1px solid rgba(255,255,255,.4);
-}
-
-.tabRow{
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-}
-
-.muted{
-  font-size:12px;
-  color:rgba(255,255,255,.7);
-  margin-top:12px;
-}
-
-a{ color:#cfe1ff; text-decoration:none; word-break:break-all; }
-
-pre{
-  margin-top:16px;
-  background:rgba(10,20,40,.7);
-  border:1px solid rgba(255,255,255,.3);
-  border-radius:18px;
-  padding:14px;
-  font-size:12px;
-  white-space:pre-wrap;
-  word-break:break-word;
-  color:#eaf1ff;
-  backdrop-filter:blur(14px);
-}
-
-/* -------- PROFILE -------- */
-
-.profile{
-  display:flex;
-  gap:12px;
-  align-items:flex-start;
-  padding:12px;
-  border-radius:18px;
-  background:rgba(255,255,255,0.16);
-  border:1px solid rgba(255,255,255,0.28);
-  backdrop-filter:blur(18px);
-  margin-bottom:14px;
-  user-select:none;
-  transition:background .18s ease, border-color .18s ease;
-}
-
-.profile:active{
-  background:rgba(255,255,255,0.18);
-  border-color:rgba(255,255,255,0.32);
-}
-
-.pfp{
-  width:44px;
-  height:44px;
-  border-radius:50%;
-  object-fit:cover;
-  border:1px solid rgba(255,255,255,.35);
-  background:rgba(255,255,255,0.18);
+.card {
+  width: 100%;
+  max-width: 760px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.28),
+    rgba(255,255,255,0.08)
+  );
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.35);
+  padding: 22px;
   box-shadow:
-    0 0 0 3px var(--pfpRing, rgba(255,255,255,.18)),
-    0 10px 24px rgba(0,30,120,.25);
+    0 30px 80px rgba(0,60,180,.45),
+    inset 0 1px 0 rgba(255,255,255,.45);
 }
 
-.profileInfo{
-  flex:1;
-  min-width:0;
+/* =====================
+   PROFILE
+===================== */
+
+.profile {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.28);
+  backdrop-filter: blur(18px);
+  margin-bottom: 14px;
 }
 
-.profileName{
-  font-weight:900;
-  letter-spacing:.2px;
-  font-size:14px;
-  line-height:1.15;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+.pfp {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#000, #000) padding-box,
+    linear-gradient(135deg, #60a5fa, #2563eb, #7c3aed) border-box;
 }
 
-.profileUsername{
-  font-size:12px;
-  color:rgba(255,255,255,.72);
-  line-height:1.15;
-  margin-top:-2px; /* user */
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+.profileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.profileBadges{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top:8px;
+.profileName {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.profileTop{
-  display:flex;
-  align-items:baseline;
-  gap:10px;
-  flex-wrap:wrap;
+.profileUsername {
+  font-size: 13px;
+  margin-top: -2px;
 }
 
-.badge{
-  display:inline-block;
-  padding:4px 10px;
-  border-radius:999px;
-  font-size:12px;
-  background:rgba(255,255,255,0.22);
-  border:1px solid rgba(255,255,255,0.30);
+.profileBadges {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
-/* Neynar badge: gradasi */
-.badge.neynar,
-#neynarScore{
-  background:linear-gradient(90deg, rgba(99,102,241,.55), rgba(59,130,246,.55), rgba(16,185,129,.45));
-  border:1px solid rgba(255,255,255,.25);
-  box-shadow:0 10px 26px rgba(59,130,246,.18);
+/* =====================
+   BADGES
+===================== */
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.22);
+  border: 1px solid rgba(255,255,255,0.30);
 }
 
-/* collapse / expand (toggle class di .profile) */
-.profileInfo{
-  max-height:200px;
-  opacity:1;
-  transform:translateY(0);
-  transition:max-height .22s ease, opacity .18s ease, transform .22s ease;
+.badge.neynar {
+  background: linear-gradient(135deg, #60a5fa, #2563eb, #7c3aed);
+  border: none;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
 }
 
-.profile.isCollapsed{
-  align-items:center;
+/* =====================
+   FORM & BUTTONS
+===================== */
+
+h1 {
+  font-size: 22px;
+  margin: 6px 0 12px;
 }
 
-.profile.isCollapsed .profileInfo{
-  max-height:0;
-  opacity:0;
-  transform:translateY(-4px);
-  overflow:hidden;
-  pointer-events:none;
-  margin:0;
+.row {
+  display: grid;
+  gap: 12px;
 }
 
-/* -------- CONTENT -------- */
-
-.resultCard{
-  margin-top:14px;
-  padding:14px;
-  border-radius:18px;
-  background:rgba(255,255,255,0.16);
-  border:1px solid rgba(255,255,255,0.28);
-  backdrop-filter:blur(18px);
+input {
+  padding: 15px 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.28);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff;
+  font-size: 14px;
+  outline: none;
 }
 
-.click{ cursor:pointer; text-decoration:underline; }
-.small{ font-size:12px; color:rgba(255,255,255,.75); }
-
-.tableWrap{
-  margin-top:14px;
-  border-radius:18px;
-  background:rgba(10,20,40,.45);
-  border:1px solid rgba(255,255,255,.20);
-  overflow:hidden;
+input::placeholder {
+  color: rgba(255,255,255,.65);
 }
 
-.tableScroll{ overflow:auto; max-height:420px; }
-
-table{
-  width:100%;
-  border-collapse:separate;
-  border-spacing:0;
-  font-size:12px;
+button {
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
+  box-shadow:
+    0 14px 40px rgba(37,99,235,.65),
+    inset 0 1px 0 rgba(255,255,255,.35);
 }
 
-thead th{
-  position:sticky;
-  top:0;
-  background:rgba(0,0,0,.25);
-  backdrop-filter:blur(12px);
-  text-align:left;
-  padding:12px;
-  border-bottom:1px solid rgba(255,255,255,.15);
+button.secondary {
+  background: rgba(255,255,255,0.25);
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,.4);
 }
 
-tbody td{
-  padding:12px;
-  border-bottom:1px solid rgba(255,255,255,.10);
+/* =====================
+   TABS
+===================== */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-/* -------- GAS TRACKER -------- */
-
-.gasWrap{ margin-top:6px; }
-
-.gasTopBar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:12px;
+.tabs button {
+  flex: 1;
 }
 
-.gasTitle{ font-weight:900; letter-spacing:.2px; }
-.gasNext{ font-size:12px; color:rgba(255,255,255,.75); }
+/* =====================
+   CONTENT
+===================== */
 
-.gasGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
+.muted {
+  font-size: 12px;
+  color: rgba(255,255,255,.7);
 }
 
-.gasCard{
-  padding:14px;
-  border-radius:18px;
-  background:rgba(255,255,255,0.12);
-  border:1px solid rgba(255,255,255,0.18);
-  backdrop-filter:blur(16px);
+a {
+  color: #cfe1ff;
+  text-decoration: none;
 }
 
-.gasCard.center{ grid-column:1 / -1; }
-
-.gasCardHead{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  font-weight:800;
-  margin-bottom:8px;
+.click {
+  cursor: pointer;
+  color: #cfe1ff;
 }
 
-.gasEmoji{ width:18px; text-align:center; }
-
-.gasValue{
-  font-size:22px;
-  font-weight:900;
-  margin-bottom:6px;
+.small {
+  font-size: 11px;
+  color: rgba(255,255,255,.7);
 }
 
-.gasSub{ font-size:12px; color:rgba(255,255,255,.72); }
-
-.gasInfoGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
+.resultCard {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(10,20,40,.65);
+  border: 1px solid rgba(255,255,255,.25);
 }
 
-.gasInfoCard{
-  padding:12px;
-  border-radius:14px;
-  background:rgba(255,255,255,0.10);
-  border:1px solid rgba(255,255,255,0.16);
+/* =====================
+   TABLE
+===================== */
+
+.tableWrap {
+  margin-top: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(10,20,40,.7);
 }
 
-.gasInfoLabel{
-  font-size:11px;
-  letter-spacing:.6px;
-  color:rgba(255,255,255,.65);
-  margin-bottom:6px;
+.tableScroll {
+  max-height: 360px;
+  overflow: auto;
 }
 
-.gasInfoValue{ font-size:14px; font-weight:900; }
-
-.gasFoot{
-  margin-top:10px;
-  font-size:12px;
-  color:rgba(255,255,255,.72);
+table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.gasActionTableWrap{
-  margin-top:10px;
-  border-radius:14px;
-  overflow:hidden;
-  border:1px solid rgba(255,255,255,.14);
+th, td {
+  padding: 10px;
+  text-align: left;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.12);
 }
 
-.gasActionTable{
-  width:100%;
-  border-collapse:separate;
-  border-spacing:0;
-  font-size:12px;
+th {
+  position: sticky;
+  top: 0;
+  background: rgba(10,20,40,.85);
+  z-index: 1;
 }
 
-.gasActionTable th, .gasActionTable td{
-  padding:10px 12px;
-  border-bottom:1px solid rgba(255,255,255,.10);
+/* =====================
+   GAS
+===================== */
+
+.gasWrap {
+  margin-top: 10px;
 }
 
-.gasActionTable thead th{
-  background:rgba(0,0,0,.20);
+.gasTopBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
-.gasActionTable tbody tr:last-child td{ border-bottom:none; }
-```0
+.gasTitle {
+  font-weight: 800;
+}
+
+.gasNext {
+  font-size: 12px;
+  opacity: .85;
+}
+
+.gasGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.gasCard {
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.28);
+  text-align: center;
+}
+
+.gasValue {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 6px 0;
+}
+
+.gasSub {
+  font-size: 11px;
+  opacity: .8;
+}
+
+.gasInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.gasInfoCard {
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.28);
+}
+
+.gasInfoLabel {
+  font-size: 11px;
+  opacity: .75;
+}
+
+.gasInfoValue {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* =====================
+   RESPONSIVE
+===================== */
+
+@media (max-width: 520px) {
+  .gasGrid {
+    grid-template-columns: 1fr;
+  }
+}
