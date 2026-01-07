@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <title>Base Mini Scan</title>
   <meta name="description" content="Fast Base explorer mini app for addresses, transactions, and blocks." />
 
@@ -33,12 +34,15 @@
 <body>
   <div class="wrap" id="wrap">
     <div class="card">
+
+      <!-- Profile -->
       <div class="profile">
         <img id="pfp" class="pfp" alt="pfp" />
         <div>
           <div class="profileTop">
             <b id="fcName">Loading…</b>
             <span class="badge" id="fcFid">FID: -</span>
+            <span class="badge" id="neynarScore">Neynar: -</span>
           </div>
           <div class="muted" id="fcUser">@-</div>
         </div>
@@ -46,19 +50,28 @@
 
       <h1>Base Mini Scan</h1>
 
+      <!-- Search -->
       <div class="row">
-        <input id="query" placeholder="Paste address / tx hash / block number" autocomplete="off" />
-        <button id="open">Open</button>
-        <button id="fetch" class="secondary">Fetch</button>
+        <input
+          id="query"
+          placeholder="Paste address / tx hash / block number"
+          autocomplete="off"
+          inputmode="text"
+          spellcheck="false"
+        />
+        <button id="open" type="button">Open</button>
+        <button id="fetch" class="secondary" type="button">Fetch</button>
       </div>
 
       <div class="muted" id="link"></div>
 
+      <!-- Tabs -->
       <div class="row two" style="margin-top: 12px;">
-        <button id="tabTx" class="secondary">Transactions</button>
-        <button id="tabErc20" class="secondary">ERC-20 Transfers</button>
+        <button id="tabTx" class="secondary" type="button">Transactions</button>
+        <button id="tabErc20" class="secondary" type="button">ERC-20 Transfers</button>
       </div>
 
+      <!-- Output -->
       <div id="output"></div>
 
       <div class="muted">Farcaster Mini App • Base Network</div>
