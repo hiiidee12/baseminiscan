@@ -1,1 +1,98 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BaseScan Finder</title>
 
+  <!-- Mini App / Embed metadata (biar enak dishare) -->
+  <meta property="og:title" content="BaseScan Finder" />
+  <meta property="og:description" content="Cari address/tx/block di BaseScan, dan lihat ringkasannya." />
+  <meta property="og:image" content="/assets/card.png" />
+  <meta property="og:type" content="website" />
+
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:0; background:#0b0b10; color:#fff;}
+    .wrap{max-width:720px; margin:0 auto; padding:20px;}
+    .card{background:#141421; border:1px solid #24243a; border-radius:16px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.25);}
+    h1{font-size:20px; margin:0 0 6px;}
+    p{margin:0 0 14px; color:#b7b7d6; font-size:14px; line-height:1.4;}
+    input,button{width:100%; padding:12px 14px; border-radius:12px; border:1px solid #2b2b44; background:#0f0f19; color:#fff; font-size:14px; box-sizing:border-box;}
+    button{cursor:pointer; background:#2b63ff; border-color:#2b63ff; font-weight:600; margin-top:10px;}
+    button:disabled{opacity:.6; cursor:not-allowed;}
+    .row{display:grid; grid-template-columns:1fr; gap:10px;}
+    .muted{color:#9aa0c7; font-size:12px; margin-top:10px;}
+    .pill{display:inline-block; padding:6px 10px; border-radius:999px; background:#1e1e30; border:1px solid #2b2b44; font-size:12px; color:#c9cdf0;}
+    a{color:#7aa2ff; text-decoration:none;}
+    pre{white-space:pre-wrap; word-break:break-word; background:#0f0f19; border:1px solid #2b2b44; padding:12px; border-radius:12px; font-size:12px; color:#d6d9ff;}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>BaseScan Finder</h1>
+      <p>Masukkan <span class="pill">Address</span> / <span class="pill">Tx Hash</span> / <span class="pill">Block</span> lalu buka di BaseScan. Kalau API key diset, kamu juga bisa lihat ringkasan dari API.</p>
+
+      <div class="row">
+        <input id="q" placeholder="Contoh: 0xabc... / 0xTxHash... / 40491310" autocomplete="off" />
+        <button id="go">Buka di BaseScan</button>
+        <button id="fetch">Ambil ringkasan (via BaseScan API)</button>
+      </div>
+
+      <div class="muted" id="linkWrap"></div>
+      <div id="out" style="margin-top:12px;"></div>
+      <div class="muted" style="margin-top:12px;">
+        Tips: kalau tombol API error “Missing/Invalid API Key”, set environment variable <b>BASESCAN_API_KEY</b> di Vercel (lihat bagian bawah).
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function isHex(s){ return /^0x[0-9a-fA-F]+$/.test(s); }
+  function isAddress(s){ return /^0x[0-9a-fA-F]{40}$/.test(s); }
+  function isTx(s){ return /^0x[0-9a-fA-F]{64}$/.test(s); }
+  function isBlock(s){ return /^[0-9]{1,20}$/.test(s); }
+
+  function basescanUrl(q){
+    q = q.trim();
+    if(isTx(q)) return `https://basescan.org/tx/${q}`;
+    if(isAddress(q)) return `https://basescan.org/address/${q}`;
+    if(isBlock(q)) return `https://basescan.org/block/${q}`;
+    // fallback: pakai search
+    return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
+  }
+
+  function setLink(url){
+    $("linkWrap").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  }
+
+  $("go").onclick = () => {
+    const q = $("q").value.trim();
+    if(!q) return;
+    const url = basescanUrl(q);
+    setLink(url);
+    // buka langsung
+    window.location.href = url;
+  };
+
+  $("fetch").onclick = async () => {
+    const q = $("q").value.trim();
+    if(!q) return;
+    const url = basescanUrl(q);
+    setLink(url);
+
+    $("out").innerHTML = `<div class="muted">Loading API...</div>`;
+    try{
+      const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      $("out").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    }catch(e){
+      $("out").innerHTML = `<pre>${JSON.stringify({error:String(e)}, null, 2)}</pre>`;
+    }
+  };
+</script>
+</body>
+</html>
