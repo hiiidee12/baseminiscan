@@ -184,16 +184,58 @@ async function loadAddressView(address, tab = "tx") {
   );
 }
 
+function fmtGwei(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "-";
+  return n < 1 ? n.toFixed(4) : n.toFixed(2);
+}
+
+function gasUtilPercent(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "-";
+  return (n * 100).toFixed(2) + "%";
+}
+
+function renderGas(g) {
+  return `
+    <div class="resultCard">
+      <div class="badge">Gas (Base)</div>
+      <div class="row two" style="margin-top:12px">
+        <div><b>Standard</b><div>${fmtGwei(g.safe)} Gwei</div></div>
+        <div><b>Fast</b><div>${fmtGwei(g.fast)} Gwei</div></div>
+      </div>
+      <div style="margin-top:10px"><b>Rapid</b><div>${fmtGwei(g.rapid)} Gwei</div></div>
+      <div class="muted" style="margin-top:12px">
+        Last block: ${g.lastBlock ?? "-"}<br/>
+        Avg utilization: ${gasUtilPercent(g.gasUsedRatio)}
+      </div>
+    </div>
+  `;
+}
+
+async function loadGas() {
+  $("output").innerHTML = `<div class="muted">Loading gas…</div>`;
+  try {
+    const r = await fetch("/api/gas");
+    const j = await r.json();
+    if (!r.ok || j?.error) {
+      $("output").innerHTML = `<pre>${JSON.stringify(j, null, 2)}</pre>`;
+      return;
+    }
+    $("output").innerHTML = renderGas(j);
+  } catch (e) {
+    $("output").innerHTML = `<pre>${String(e)}</pre>`;
+  }
+}
+
 $("open").onclick = async () => {
   const q = $("query").value.trim();
   if (!q) return;
-
   if (isAddress(q)) {
     $("link").textContent = "";
     await loadAddressView(q, "tx");
     return;
   }
-
   const url = makeBaseScanUrl(q);
   $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
   openExternal(url);
@@ -214,6 +256,8 @@ $("tabErc20").onclick = () => {
   const q = $("query").value.trim();
   if (isAddress(q)) loadAddressView(q, "erc20");
 };
+
+$("gas").onclick = loadGas;
 
 $("query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("open").click();
