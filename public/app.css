@@ -122,6 +122,16 @@ h1 {
   gap: 12px;
 }
 
+.row.two {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 420px) {
+  .row.two {
+    grid-template-columns: 1fr;
+  }
+}
+
 input {
   width: 100%;
   padding: 14px 16px;
@@ -157,16 +167,6 @@ button.secondary {
   background: rgba(255,255,255,0.25);
   box-shadow: none;
   border: 1px solid rgba(255,255,255,.4);
-}
-
-/* =========================
-   TABS
-========================= */
-.tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 10px;
 }
 
 /* =========================
