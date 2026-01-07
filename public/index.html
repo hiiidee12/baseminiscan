@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Base Mini Scan</title>
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Base Mini Scan" />
+  <meta property="og:description" content="Fast BaseScan lookup for address, transaction hash, and block on Base." />
+  <meta property="og:image" content="https://YOUR_DOMAIN/assets/card.png" />
+  <meta property="og:url" content="https://YOUR_DOMAIN/" />
+  <meta property="og:type" content="website" />
+
+  <!-- Twitter / Warpcast -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Base Mini Scan" />
+  <meta name="twitter:description" content="Base Network explorer helper" />
+  <meta name="twitter:image" content="https://YOUR_DOMAIN/assets/card.png" />
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    /* Animated Base-blue background */
+    body {
+      background:
+        radial-gradient(900px 500px at 10% 10%, rgba(0,112,255,.55), transparent 40%),
+        radial-gradient(800px 500px at 90% 20%, rgba(80,160,255,.45), transparent 45%),
+        linear-gradient(180deg, #020617, #020b2a, #041e42);
+      background-size: 200% 200%;
+      animation: bgMove 18s ease-in-out infinite;
+    }
+
+    @keyframes bgMove {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Auto-fit Mini App height */
+    .wrap {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* Frosted glass card */
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.28),
+        rgba(255,255,255,0.08)
+      );
+      backdrop-filter: blur(32px) saturate(180%);
+      -webkit-backdrop-filter: blur(32px) saturate(180%);
+      border-radius: 26px;
+      border: 1px solid rgba(255,255,255,0.35);
+      padding: 22px;
+      box-shadow:
+        0 30px 80px rgba(0,60,180,.45),
+        inset 0 1px 0 rgba(255,255,255,.45);
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0 0 12px;
+      letter-spacing: .4px;
+    }
+
+    .row {
+      display: grid;
+      gap: 14px;
+    }
+
+    input {
+      padding: 15px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.28);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      backdrop-filter: blur(16px);
+    }
+
+    input::placeholder {
+      color: rgba(255,255,255,.65);
+    }
+
+    button {
+      padding: 15px 16px;
+      border-radius: 20px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
+      box-shadow:
+        0 14px 40px rgba(37,99,235,.65),
+        inset 0 1px 0 rgba(255,255,255,.35);
+    }
+
+    button.secondary {
+      background: rgba(255,255,255,0.25);
+      box-shadow: none;
+      border: 1px solid rgba(255,255,255,.4);
+    }
+
+    .muted {
+      font-size: 12px;
+      color: rgba(255,255,255,.7);
+      margin-top: 12px;
+    }
+
+    a {
+      color: #cfe1ff;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    pre {
+      margin-top: 16px;
+      background: rgba(10,20,40,.7);
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 18px;
+      padding: 14px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #eaf1ff;
+      backdrop-filter: blur(14px);
+    }
+
+    /* Farcaster user profile */
+    .profile {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.28);
+      backdrop-filter: blur(18px);
+      margin-bottom: 14px;
+    }
+
+    .pfp {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,0.18);
+    }
+
+    .profileTop {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.22);
+      border: 1px solid rgba(255,255,255,0.30);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="wrap">
+    <div class="card">
+      <!-- Auto-detected Farcaster user -->
+      <div class="profile">
+        <img id="pfp" class="pfp" alt="pfp" />
+        <div>
+          <div class="profileTop">
+            <b id="fcName">Loading…</b>
+            <span class="badge" id="fcFid">FID: -</span>
+          </div>
+          <div class="muted" id="fcUser">@-</div>
+        </div>
+      </div>
+
+      <h1>Base Mini Scan</h1>
+
+      <div class="row">
+        <input
+          id="query"
+          placeholder="0xabc... / 0xTxHash... / 12345678"
+          autocomplete="off"
+        />
+
+        <button id="open">Open on BaseScan</button>
+        <button id="fetch" class="secondary">Fetch summary (API)</button>
+      </div>
+
+      <div class="muted" id="link"></div>
+      <div id="output"></div>
+
+      <div class="muted">
+        Farcaster Mini App • Base Network
+      </div>
+    </div>
+  </div>
+
+  <!-- Logic -->
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const isAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
+    const isTx = (v) => /^0x[a-fA-F0-9]{64}$/.test(v);
+    const isBlock = (v) => /^[0-9]{1,20}$/.test(v);
+
+    function makeBaseScanUrl(q) {
+      if (isTx(q)) return `https://basescan.org/tx/${q}`;
+      if (isAddress(q)) return `https://basescan.org/address/${q}`;
+      if (isBlock(q)) return `https://basescan.org/block/${q}`;
+      return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
+    }
+
+    $("open").onclick = () => {
+      const q = $("query").value.trim();
+      if (!q) return;
+      const url = makeBaseScanUrl(q);
+      $("link").innerHTML = `Link: <a href="${url}" target="_blank">${url}</a>`;
+      window.location.href = url;
+    };
+
+    $("fetch").onclick = async () => {
+      const q = $("query").value.trim();
+      if (!q) return;
+      $("output").innerHTML = `<div class="muted">Loading...</div>`;
+      try {
+        const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        $("output").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (e) {
+        $("output").innerHTML = `<pre>${e.toString()}</pre>`;
+      }
+    };
+  </script>
+
+  <!-- Farcaster Mini App SDK -->
+  <script type="module">
+    import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
+
+    try {
+      const inMiniApp = await sdk.isInMiniApp();
+      if (!inMiniApp) {
+        document.getElementById("fcName").textContent = "Open in Farcaster client";
+        return;
+      }
+
+      const ctx = await sdk.context;
+      const u = ctx?.user || {};
+
+      document.getElementById("fcName").textContent =
+        u.displayName || u.username || "Farcaster User";
+      document.getElementById("fcFid").textContent = `FID: ${u.fid ?? "-"}`;
+      document.getElementById("fcUser").textContent =
+        u.username ? `@${u.username}` : "@-";
+      document.getElementById("pfp").src = u.pfpUrl || "";
+
+      const insets = ctx?.client?.safeAreaInsets;
+      if (insets) {
+        const wrap = document.getElementById("wrap");
+        wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
+        wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
+      }
+    } catch (err) {
+      console.warn("MiniApp SDK error:", err);
+    }
+  </script>
+</body>
+</html>
