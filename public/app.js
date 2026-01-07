@@ -30,7 +30,7 @@ async function openExternal(url) {
     }
   } catch (e) {}
 
-  // ✅ Fallback yang pasti jalan di Mini App webview & browser
+  // Fallback yang pasti jalan di Mini App webview & browser
   window.location.href = url;
 }
 
@@ -263,4 +263,3 @@ $("tabErc20").onclick = async () => {
 $("query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("open").click();
 });
-```0
