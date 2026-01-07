@@ -84,7 +84,10 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list = []) {
-  const rows = list.slice(0, 25).map((tx) => `
+  const rows = list
+    .slice(0, 25)
+    .map(
+      (tx) => `
     <tr>
       <td>
         <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">
@@ -97,7 +100,9 @@ function renderTxTable(list = []) {
       <td class="small">${shortHex(tx.to)}</td>
       <td>${weiToEthStr(tx.value) ?? "0"} ETH</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   return `
     <div class="tableWrap">
@@ -118,16 +123,21 @@ function renderTxTable(list = []) {
 }
 
 function renderErc20Table(list = []) {
-  const rows = list.slice(0, 25).map((t) => `
+  const rows = list
+    .slice(0, 25)
+    .map(
+      (t) => `
     <tr>
       <td>${shortHex(t.hash)}</td>
       <td class="small">${ageFromTs(t.timeStamp)}</td>
-      <td>${t.tokenSymbol}</td>
+      <td>${t.tokenSymbol || "-"}</td>
       <td class="small">${shortHex(t.from)}</td>
       <td class="small">${shortHex(t.to)}</td>
-      <td>${t.value}</td>
+      <td>${t.value ?? "-"}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   return `
     <div class="tableWrap">
@@ -159,32 +169,183 @@ async function loadAddressView(address, tab = "tx") {
   out.innerHTML = `<div class="muted">Loading…</div>`;
 
   try {
-    const r = await fetch(`/api/address?address=${address}&tab=${tab}`);
+    const r = await fetch(
+      `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}`,
+      { cache: "no-store" }
+    );
     const j = await r.json();
 
     if (!r.ok || j?.error) throw j;
 
     const html =
       renderOverview(address, j.balanceWei) +
-      (tab === "erc20"
-        ? renderErc20Table(j.list)
-        : renderTxTable(j.list));
+      (tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list));
 
     out.innerHTML = html;
 
-    out.querySelectorAll("[data-open]").forEach((el) =>
-      el.onclick = () => openExternal(el.dataset.open)
-    );
+    out.querySelectorAll("[data-open]").forEach((el) => {
+      el.onclick = () => openExternal(el.dataset.open);
+    });
   } catch (e) {
-    out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
+    const msg =
+      typeof e === "string"
+        ? e
+        : e?.message
+        ? e.message
+        : JSON.stringify(e, null, 2);
+    out.innerHTML = `<pre>${msg}</pre>`;
   }
+}
+
+/* =========================
+   GAS UI (embedded fix)
+========================= */
+
+let __gasTimer = null;
+
+function fmtGwei(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "-";
+  return n < 1 ? n.toFixed(3) : n.toFixed(1);
+}
+
+function rapidFromFast(fast) {
+  const n = Number(fast);
+  if (!Number.isFinite(n)) return null;
+  return n * 1.25;
+}
+
+function gasUtilPercent(gasUsedRatio) {
+  const n = Number(gasUsedRatio);
+  if (!Number.isFinite(n)) return "-";
+  return (n * 100).toFixed(2) + "%";
+}
+
+function usdFrom(gwei, gasUnits, ethUsd) {
+  const g = Number(gwei);
+  const u = Number(gasUnits);
+  const p = Number(ethUsd);
+  if (!Number.isFinite(g) || !Number.isFinite(u) || !Number.isFinite(p)) return "-";
+  const usd = (g * 1e-9) * u * p;
+  if (!Number.isFinite(usd)) return "-";
+  return usd < 0.01 ? "< $0.01" : `$${usd.toFixed(3)}`;
+}
+
+function renderGas(g, nextSec) {
+  const standard = fmtGwei(g.safe);
+  const fast = fmtGwei(g.fast);
+  const rapid = fmtGwei(g.rapid ?? rapidFromFast(g.fast));
+
+  const ethUsd = Number(g.ethUsd);
+  const ethUsdStr = Number.isFinite(ethUsd) ? `$${ethUsd.toFixed(2)}` : "-";
+
+  // gas units (perkiraan)
+  const UNITS = {
+    transfer: 21000,
+    erc20: 65000,
+    swap: 150000,
+    lp: 220000,
+  };
+
+  const sUsdTransfer = usdFrom(g.safe, UNITS.transfer, g.ethUsd);
+  const fUsdTransfer = usdFrom(g.fast, UNITS.transfer, g.ethUsd);
+  const rUsdTransfer = usdFrom(g.rapid ?? rapidFromFast(g.fast), UNITS.transfer, g.ethUsd);
+
+  const sUsdSwap = usdFrom(g.safe, UNITS.swap, g.ethUsd);
+  const fUsdSwap = usdFrom(g.fast, UNITS.swap, g.ethUsd);
+  const rUsdSwap = usdFrom(g.rapid ?? rapidFromFast(g.fast), UNITS.swap, g.ethUsd);
+
+  const sUsdLp = usdFrom(g.safe, UNITS.lp, g.ethUsd);
+  const fUsdLp = usdFrom(g.fast, UNITS.lp, g.ethUsd);
+  const rUsdLp = usdFrom(g.rapid ?? rapidFromFast(g.fast), UNITS.lp, g.ethUsd);
+
+  return `
+    <div class="gasWrap">
+      <div class="gasTopBar">
+        <div class="gasTitle">Base Gas Tracker ⛽</div>
+        <div class="gasNext">Next update in <b>${nextSec}s</b></div>
+      </div>
+
+      <div class="gasGrid">
+        <div class="gasCard">
+          <div class="gasCardHead"><div class="gasEmoji">🙂</div> Standard</div>
+          <div class="gasValue standard">${standard} Gwei</div>
+          <div class="gasSub">${sUsdTransfer} • ~ 12–16 secs</div>
+        </div>
+
+        <div class="gasCard">
+          <div class="gasCardHead"><div class="gasEmoji">😄</div> Fast</div>
+          <div class="gasValue fast">${fast} Gwei</div>
+          <div class="gasSub">${fUsdTransfer} • ~ 6–8 secs</div>
+        </div>
+
+        <div class="gasCard center">
+          <div class="gasCardHead"><div class="gasEmoji">🚀</div> Rapid</div>
+          <div class="gasValue rapid">${rapid} Gwei</div>
+          <div class="gasSub">${rUsdTransfer} • ~ 2–3 secs</div>
+        </div>
+      </div>
+
+      <div class="resultCard" style="padding:14px;">
+        <div style="font-weight:800;margin-bottom:10px;">Additional Info</div>
+
+        <div class="gasInfoGrid">
+          <div class="gasInfoCard">
+            <div class="gasInfoLabel">LAST BLOCK</div>
+            <div class="gasInfoValue">${g.lastBlock ?? "-"}</div>
+          </div>
+          <div class="gasInfoCard">
+            <div class="gasInfoLabel">AVG. UTILIZATION</div>
+            <div class="gasInfoValue">${gasUtilPercent(g.gasUsedRatio)}</div>
+          </div>
+        </div>
+
+        <div class="gasMeta muted" style="margin-top:10px;">
+          ETH/USD: <b>${ethUsdStr}</b> • Source: ${g.source ?? "-"}
+        </div>
+
+        <div style="font-weight:800;margin:14px 0 8px;">Featured Actions</div>
+        <div class="tableWrap">
+          <div class="tableScroll">
+            <table>
+              <thead>
+                <tr><th>Action</th><th>Low</th><th>Average</th><th>High</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>ERC-20 Transfer</td>
+                  <td>${sUsdTransfer}</td>
+                  <td>${fUsdTransfer}</td>
+                  <td>${rUsdTransfer}</td>
+                </tr>
+                <tr>
+                  <td>Swap</td>
+                  <td>${sUsdSwap}</td>
+                  <td>${fUsdSwap}</td>
+                  <td>${rUsdSwap}</td>
+                </tr>
+                <tr>
+                  <td>Add/Remove LP</td>
+                  <td>${sUsdLp}</td>
+                  <td>${fUsdLp}</td>
+                  <td>${rUsdLp}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="muted" style="margin-top:10px;">
+          Note: estimasi USD = (gwei × gasUnits) × ETH/USD
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 /* =========================
    GAS (1 minute refresh)
 ========================= */
-
-let __gasTimer = null;
 
 async function loadGasOnce(next) {
   const out = $("output");
@@ -192,10 +353,16 @@ async function loadGasOnce(next) {
   try {
     const r = await fetch("/api/gas", { cache: "no-store" });
     const j = await r.json();
-    if (!r.ok) throw j;
+    if (!r.ok || j?.error) throw j;
     out.innerHTML = renderGas(j, next);
   } catch (e) {
-    out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
+    const msg =
+      typeof e === "string"
+        ? e
+        : e?.message
+        ? e.message
+        : JSON.stringify(e, null, 2);
+    out.innerHTML = `<pre>${msg}</pre>`;
   }
 }
 
@@ -238,20 +405,23 @@ window.addEventListener("DOMContentLoaded", () => {
     } else {
       stopGasAutoRefresh();
       const url = makeBaseScanUrl(q);
-      $("link").innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+      $("link").innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
       openExternal(url);
     }
   });
 
   $("fetch")?.addEventListener("click", () => $("open").click());
+
   $("tabTx")?.addEventListener("click", () => {
     const q = $("query").value.trim();
     if (isAddress(q)) loadAddressView(q, "tx");
   });
+
   $("tabErc20")?.addEventListener("click", () => {
     const q = $("query").value.trim();
     if (isAddress(q)) loadAddressView(q, "erc20");
   });
+
   $("gas")?.addEventListener("click", startGasAutoRefresh);
 
   $("query")?.addEventListener("keydown", (e) => {
