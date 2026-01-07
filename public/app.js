@@ -28,9 +28,7 @@ async function openExternal(url) {
       await window.__fcSdk.actions.openUrl(url);
       return;
     }
-  } catch (e) {}
-
-  // Fallback yang pasti jalan di Mini App webview & browser
+  } catch (_) {}
   window.location.href = url;
 }
 
@@ -38,7 +36,6 @@ function setActiveTab(tab) {
   const tx = $("tabTx");
   const erc = $("tabErc20");
   if (!tx || !erc) return;
-
   if (tab === "tx") {
     tx.classList.remove("secondary");
     erc.classList.add("secondary");
@@ -79,17 +76,15 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list) {
-  const rows = list
-    .slice(0, 25)
-    .map((tx) => {
-      const hash = tx.hash || tx.transactionHash || "-";
-      const from = tx.from || "-";
-      const to = tx.to || "-";
-      const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
-      const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
-      const block = tx.blockNumber || "-";
+  const rows = list.slice(0, 25).map((tx) => {
+    const hash = tx.hash || tx.transactionHash || "-";
+    const from = tx.from || "-";
+    const to = tx.to || "-";
+    const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
+    const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
+    const block = tx.blockNumber || "-";
 
-      return `
+    return `
       <tr>
         <td>
           <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
@@ -101,8 +96,7 @@ function renderTxTable(list) {
         <td>${valueEth}</td>
       </tr>
     `;
-    })
-    .join("");
+  }).join("");
 
   return `
     <div class="tableWrap">
@@ -127,39 +121,24 @@ function renderTxTable(list) {
 }
 
 function renderErc20Table(list) {
-  const rows = list
-    .slice(0, 25)
-    .map((t) => {
-      const hash = t.hash || t.transactionHash || "-";
-      const token = t.tokenSymbol || "-";
-      const tokenName = t.tokenName || token;
-      const from = t.from || "-";
-      const to = t.to || "-";
-      const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
+  const rows = list.slice(0, 25).map((t) => {
+    const hash = t.hash || t.transactionHash || "-";
+    const token = t.tokenSymbol || "-";
+    const from = t.from || "-";
+    const to = t.to || "-";
+    const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
 
-      const dec = Number(t.tokenDecimal || "0");
-      const raw = t.value || "0";
-      let amount = raw;
-      const n = Number(raw);
-      if (Number.isFinite(n) && dec >= 0 && dec <= 18) {
-        amount = (n / Math.pow(10, dec)).toFixed(6);
-      }
-
-      return `
+    return `
       <tr>
         <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
         <td class="small">${age}</td>
-        <td>
-          <div><b>${token}</b></div>
-          <div class="small">${tokenName}</div>
-        </td>
+        <td><b>${token}</b><div class="small">${t.tokenName || token}</div></td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
-        <td>${amount}</td>
+        <td>-</td>
       </tr>
     `;
-    })
-    .join("");
+  }).join("");
 
   return `
     <div class="tableWrap">
@@ -186,14 +165,9 @@ function renderErc20Table(list) {
 
 async function loadAddressView(address, tab = "tx") {
   setActiveTab(tab);
-  $("output").innerHTML = `<div class="muted">Loading ${
-    tab === "tx" ? "transactions" : "ERC-20 transfers"
-  }…</div>`;
+  $("output").innerHTML = `<div class="muted">Loading…</div>`;
 
-  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(
-    tab
-  )}&offset=25&page=1`;
-  const res = await fetch(url);
+  const res = await fetch(`/api/address?address=${encodeURIComponent(address)}&tab=${tab}`);
   const json = await res.json();
 
   if (!res.ok || json?.error) {
@@ -203,15 +177,13 @@ async function loadAddressView(address, tab = "tx") {
 
   const overview = renderOverview(address, json.balanceWei);
   const table = tab === "erc20" ? renderErc20Table(json.list) : renderTxTable(json.list);
-
   $("output").innerHTML = overview + table;
 
-  $("output").querySelectorAll("[data-open]").forEach((el) => {
-    el.addEventListener("click", () => openExternal(el.getAttribute("data-open")));
-  });
+  $("output").querySelectorAll("[data-open]").forEach((el) =>
+    el.onclick = () => openExternal(el.getAttribute("data-open"))
+  );
 }
 
-// Buttons
 $("open").onclick = async () => {
   const q = $("query").value.trim();
   if (!q) return;
@@ -223,43 +195,26 @@ $("open").onclick = async () => {
   }
 
   const url = makeBaseScanUrl(q);
-  $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-  await openExternal(url);
+  $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+  openExternal(url);
 };
 
 $("fetch").onclick = async () => {
   const q = $("query").value.trim();
   if (!q) return;
-
-  if (isAddress(q)) {
-    await loadAddressView(q, "tx");
-    return;
-  }
-
-  $("output").innerHTML = `<div class="muted">Loading…</div>`;
-  try {
-    const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    $("output").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-  } catch (e) {
-    $("output").innerHTML = `<pre>${e.toString()}</pre>`;
-  }
+  if (isAddress(q)) return loadAddressView(q, "tx");
 };
 
-// Tabs
-$("tabTx").onclick = async () => {
+$("tabTx").onclick = () => {
   const q = $("query").value.trim();
-  if (!isAddress(q)) return;
-  await loadAddressView(q, "tx");
+  if (isAddress(q)) loadAddressView(q, "tx");
 };
 
-$("tabErc20").onclick = async () => {
+$("tabErc20").onclick = () => {
   const q = $("query").value.trim();
-  if (!isAddress(q)) return;
-  await loadAddressView(q, "erc20");
+  if (isAddress(q)) loadAddressView(q, "erc20");
 };
 
-// Enter key
 $("query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("open").click();
 });
