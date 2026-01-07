@@ -2,97 +2,284 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BaseScan Finder</title>
 
-  <!-- Mini App / Embed metadata (biar enak dishare) -->
+  <!-- Open Graph -->
   <meta property="og:title" content="BaseScan Finder" />
-  <meta property="og:description" content="Cari address/tx/block di BaseScan, dan lihat ringkasannya." />
-  <meta property="og:image" content="/assets/card.png" />
+  <meta property="og:description" content="Fast BaseScan lookup for address, tx hash, and block." />
+  <meta property="og:image" content="https://YOUR_DOMAIN/assets/card.png" />
+  <meta property="og:url" content="https://YOUR_DOMAIN/" />
   <meta property="og:type" content="website" />
 
+  <!-- Twitter / Warpcast -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="BaseScan Finder" />
+  <meta name="twitter:description" content="Base Network explorer helper" />
+  <meta name="twitter:image" content="https://YOUR_DOMAIN/assets/card.png" />
+
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:0; background:#0b0b10; color:#fff;}
-    .wrap{max-width:720px; margin:0 auto; padding:20px;}
-    .card{background:#141421; border:1px solid #24243a; border-radius:16px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.25);}
-    h1{font-size:20px; margin:0 0 6px;}
-    p{margin:0 0 14px; color:#b7b7d6; font-size:14px; line-height:1.4;}
-    input,button{width:100%; padding:12px 14px; border-radius:12px; border:1px solid #2b2b44; background:#0f0f19; color:#fff; font-size:14px; box-sizing:border-box;}
-    button{cursor:pointer; background:#2b63ff; border-color:#2b63ff; font-weight:600; margin-top:10px;}
-    button:disabled{opacity:.6; cursor:not-allowed;}
-    .row{display:grid; grid-template-columns:1fr; gap:10px;}
-    .muted{color:#9aa0c7; font-size:12px; margin-top:10px;}
-    .pill{display:inline-block; padding:6px 10px; border-radius:999px; background:#1e1e30; border:1px solid #2b2b44; font-size:12px; color:#c9cdf0;}
-    a{color:#7aa2ff; text-decoration:none;}
-    pre{white-space:pre-wrap; word-break:break-word; background:#0f0f19; border:1px solid #2b2b44; padding:12px; border-radius:12px; font-size:12px; color:#d6d9ff;}
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    /* Animated Base-blue background */
+    body {
+      background:
+        radial-gradient(900px 500px at 10% 10%, rgba(0,112,255,.55), transparent 40%),
+        radial-gradient(800px 500px at 90% 20%, rgba(80,160,255,.45), transparent 45%),
+        linear-gradient(180deg, #020617, #020b2a, #041e42);
+      background-size: 200% 200%;
+      animation: bgMove 18s ease-in-out infinite;
+    }
+    @keyframes bgMove {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Auto-fit mini app height */
+    .wrap {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* Frosted glass card */
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08));
+      backdrop-filter: blur(32px) saturate(180%);
+      -webkit-backdrop-filter: blur(32px) saturate(180%);
+      border-radius: 26px;
+      border: 1px solid rgba(255,255,255,0.35);
+      padding: 22px;
+      box-shadow: 0 30px 80px rgba(0,60,180,.45), inset 0 1px 0 rgba(255,255,255,.45);
+    }
+
+    h1 { font-size: 22px; margin: 0 0 10px; letter-spacing: .4px; }
+    p  { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.85); }
+
+    .row { display: grid; gap: 14px; }
+
+    input {
+      padding: 15px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.28);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      backdrop-filter: blur(16px);
+    }
+    input::placeholder { color: rgba(255,255,255,.65); }
+
+    button {
+      padding: 15px 16px;
+      border-radius: 20px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
+      box-shadow: 0 14px 40px rgba(37,99,235,.65), inset 0 1px 0 rgba(255,255,255,.35);
+    }
+    button.secondary {
+      background: rgba(255,255,255,0.25);
+      box-shadow: none;
+      border: 1px solid rgba(255,255,255,.4);
+    }
+    button:active { transform: translateY(1px); }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.35);
+      border: 1px solid rgba(255,255,255,0.45);
+      backdrop-filter: blur(10px);
+    }
+
+    .muted { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 12px; }
+    a { color: #cfe1ff; text-decoration: none; word-break: break-all; }
+
+    pre {
+      margin-top: 16px;
+      background: rgba(10,20,40,.7);
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 18px;
+      padding: 14px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #eaf1ff;
+      backdrop-filter: blur(14px);
+    }
+
+    /* Mini profile header (auto-detect Farcaster user) */
+    .profile {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.28);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      margin-bottom: 14px;
+    }
+    .pfp {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,0.18);
+    }
+    .profileTop {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.22);
+      border: 1px solid rgba(255,255,255,0.30);
+    }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
+  <div class="wrap" id="wrap">
     <div class="card">
-      <h1>BaseScan Finder</h1>
-      <p>Masukkan <span class="pill">Address</span> / <span class="pill">Tx Hash</span> / <span class="pill">Block</span> lalu buka di BaseScan. Kalau API key diset, kamu juga bisa lihat ringkasan dari API.</p>
-
-      <div class="row">
-        <input id="q" placeholder="Contoh: 0xabc... / 0xTxHash... / 40491310" autocomplete="off" />
-        <button id="go">Buka di BaseScan</button>
-        <button id="fetch">Ambil ringkasan (via BaseScan API)</button>
+      <!-- Auto-detect user area -->
+      <div class="profile" id="profile">
+        <img id="pfp" class="pfp" alt="pfp" />
+        <div>
+          <div class="profileTop">
+            <b id="fcName">Loading…</b>
+            <span class="badge" id="fcFid">FID: -</span>
+          </div>
+          <div class="muted" id="fcUser">@-</div>
+        </div>
       </div>
 
-      <div class="muted" id="linkWrap"></div>
-      <div id="out" style="margin-top:12px;"></div>
-      <div class="muted" style="margin-top:12px;">
-        Tips: kalau tombol API error “Missing/Invalid API Key”, set environment variable <b>BASESCAN_API_KEY</b> di Vercel (lihat bagian bawah).
+      <h1>BaseScan Finder</h1>
+
+      <p>
+        Masukkan
+        <span class="pill">Address</span>,
+        <span class="pill">Tx Hash</span>,
+        atau
+        <span class="pill">Block</span>
+        untuk membuka BaseScan.
+      </p>
+
+      <div class="row">
+        <input id="query" placeholder="0xabc... / 0xTxHash... / 12345678" autocomplete="off" />
+        <button id="open">Buka di BaseScan</button>
+        <button id="fetch" class="secondary">Ambil ringkasan (API)</button>
+      </div>
+
+      <div class="muted" id="link"></div>
+      <div id="output"></div>
+
+      <div class="muted">
+        Farcaster Mini App • Base Network
       </div>
     </div>
   </div>
 
-<script>
-  const $ = (id) => document.getElementById(id);
+  <script>
+    const $ = (id) => document.getElementById(id);
 
-  function isHex(s){ return /^0x[0-9a-fA-F]+$/.test(s); }
-  function isAddress(s){ return /^0x[0-9a-fA-F]{40}$/.test(s); }
-  function isTx(s){ return /^0x[0-9a-fA-F]{64}$/.test(s); }
-  function isBlock(s){ return /^[0-9]{1,20}$/.test(s); }
+    const isAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
+    const isTx = (v) => /^0x[a-fA-F0-9]{64}$/.test(v);
+    const isBlock = (v) => /^[0-9]{1,20}$/.test(v);
 
-  function basescanUrl(q){
-    q = q.trim();
-    if(isTx(q)) return `https://basescan.org/tx/${q}`;
-    if(isAddress(q)) return `https://basescan.org/address/${q}`;
-    if(isBlock(q)) return `https://basescan.org/block/${q}`;
-    // fallback: pakai search
-    return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
-  }
-
-  function setLink(url){
-    $("linkWrap").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-  }
-
-  $("go").onclick = () => {
-    const q = $("q").value.trim();
-    if(!q) return;
-    const url = basescanUrl(q);
-    setLink(url);
-    // buka langsung
-    window.location.href = url;
-  };
-
-  $("fetch").onclick = async () => {
-    const q = $("q").value.trim();
-    if(!q) return;
-    const url = basescanUrl(q);
-    setLink(url);
-
-    $("out").innerHTML = `<div class="muted">Loading API...</div>`;
-    try{
-      const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      $("out").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-    }catch(e){
-      $("out").innerHTML = `<pre>${JSON.stringify({error:String(e)}, null, 2)}</pre>`;
+    function makeBaseScanUrl(q) {
+      if (isTx(q)) return `https://basescan.org/tx/${q}`;
+      if (isAddress(q)) return `https://basescan.org/address/${q}`;
+      if (isBlock(q)) return `https://basescan.org/block/${q}`;
+      return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
     }
-  };
-</script>
+
+    $("open").onclick = () => {
+      const q = $("query").value.trim();
+      if (!q) return;
+      const url = makeBaseScanUrl(q);
+      $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+      window.location.href = url;
+    };
+
+    $("fetch").onclick = async () => {
+      const q = $("query").value.trim();
+      if (!q) return;
+      $("output").innerHTML = `<div class="muted">Loading...</div>`;
+      try {
+        const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        $("output").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (e) {
+        $("output").innerHTML = `<pre>${e.toString()}</pre>`;
+      }
+    };
+  </script>
+
+  <!-- Auto-detect Farcaster user via Mini App SDK (no build) -->
+  <script type="module">
+    // Uses @farcaster/miniapp-sdk: sdk.isInMiniApp() + sdk.context.user.{fid,username,displayName,pfpUrl} 1
+    import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
+
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const setImg = (id, src) => { const el = document.getElementById(id); if (el) el.src = src || ""; };
+
+    try {
+      const inMiniApp = await sdk.isInMiniApp(); // 2
+
+      if (!inMiniApp) {
+        setText("fcName", "Open in Farcaster client");
+        setText("fcFid", "FID: -");
+        setText("fcUser", "@-");
+        setImg("pfp", "");
+      } else {
+        const ctx = await sdk.context; // 3
+        const u = ctx?.user || {};
+
+        setText("fcName", u.displayName || u.username || "Farcaster User");
+        setText("fcFid", `FID: ${u.fid ?? "-"}`);
+        setText("fcUser", u.username ? `@${u.username}` : "@-");
+        setImg("pfp", u.pfpUrl || "");
+
+        // Optional: gunakan safe area insets biar UI gak ketutup navbar
+        const insets = ctx?.client?.safeAreaInsets;
+        if (insets) {
+          const wrap = document.getElementById("wrap");
+          wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
+          wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
+        }
+
+        // Optional: auto-fill input dengan username user (biar gampang copy/paste)
+        // document.getElementById("query").value = u.username ? `@${u.username}` : "";
+      }
+    } catch (err) {
+      console.warn("MiniApp SDK error:", err);
+      setText("fcName", "MiniApp context unavailable");
+    }
+  </script>
 </body>
 </html>
