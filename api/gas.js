@@ -1,125 +1,135 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+// /api/gas.js
+// Base RPC Gas Tracker (NO Etherscan key required)
 
-  <title>Base Mini Scan</title>
-  <meta name="description" content="Fast Base explorer mini app for addresses, transactions, blocks, and gas." />
+const RPC_URLS = [
+  "https://mainnet.base.org",
+  "https://base.llamarpc.com",
+];
 
-  <!-- Farcaster Mini App -->
-  <meta property="fc:miniapp" content="true" />
-  <meta property="fc:miniapp:name" content="Base Mini Scan" />
-  <meta property="fc:miniapp:url" content="https://baseminiscan.vercel.app/" />
-  <meta property="fc:miniapp:icon" content="https://baseminiscan.vercel.app/assets/icon.png" />
-  <meta property="fc:miniapp:image" content="https://baseminiscan.vercel.app/assets/card.png" />
-  <meta property="fc:miniapp:button" content="Open Mini App" />
+const PRICE_URLS = [
+  "https://api.coinbase.com/v2/prices/ETH-USD/spot",
+  "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+];
 
-  <!-- Open Graph -->
-  <meta property="og:title" content="Base Mini Scan" />
-  <meta property="og:description" content="Quick BaseScan lookup on Base Network." />
-  <meta property="og:image" content="https://baseminiscan.vercel.app/assets/card.png" />
-  <meta property="og:url" content="https://baseminiscan.vercel.app/" />
-  <meta property="og:type" content="website" />
+function hexToBigInt(hex) {
+  if (!hex) return 0n;
+  return BigInt(hex);
+}
 
-  <!-- Twitter / Warpcast -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Base Mini Scan" />
-  <meta name="twitter:description" content="Base Network explorer helper" />
-  <meta name="twitter:image" content="https://baseminiscan.vercel.app/assets/card.png" />
+function weiToGwei(weiBig) {
+  const gwei = Number(weiBig) / 1e9;
+  return Number.isFinite(gwei) ? gwei : null;
+}
 
-  <link rel="stylesheet" href="/app.css" />
-</head>
+async function rpcCall(url, method, params = []) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      params,
+    }),
+  });
 
-<body>
-  <div class="wrap" id="wrap">
-    <div class="card">
+  const json = await res.json();
+  if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
+  if (json.error) throw new Error(json.error.message || "RPC error");
+  return json.result;
+}
 
-      <!-- Profile -->
-      <div class="profile">
-        <img id="pfp" class="pfp" alt="pfp" />
-        <div>
-          <div class="profileTop">
-            <b id="fcName">Loading…</b>
-            <span class="badge" id="fcFid">FID: -</span>
-            <span class="badge" id="neynarScore">Neynar: -</span>
-          </div>
-          <div class="muted" id="fcUser">@-</div>
-        </div>
-      </div>
+async function rpcTry(method, params = []) {
+  let lastErr = null;
+  for (const url of RPC_URLS) {
+    try {
+      const result = await rpcCall(url, method, params);
+      return { url, result };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("All RPC endpoints failed");
+}
 
-      <h1>Base Mini Scan</h1>
+async function fetchEthUsd() {
+  for (const u of PRICE_URLS) {
+    try {
+      const r = await fetch(u, { headers: { accept: "application/json" } });
+      const j = await r.json();
 
-      <!-- Gas Tracker Display -->
-      <div id="gasTracker" class="muted" style="margin: 8px 0; text-align: center; font-size: 0.9em; line-height: 1.4;">
-        Loading gas prices…
-      </div>
+      const cb = Number(j?.data?.amount);
+      if (Number.isFinite(cb) && cb > 0) return cb;
 
-      <!-- Search -->
-      <div class="row">
-        <input
-          id="query"
-          placeholder="Paste address / tx hash / block number"
-          autocomplete="off"
-          inputmode="text"
-          spellcheck="false"
-        />
-        <button id="open" type="button">Open</button>
-        <button id="fetch" class="secondary" type="button">Fetch</button>
-      </div>
+      const cg = Number(j?.ethereum?.usd);
+      if (Number.isFinite(cg) && cg > 0) return cg;
+    } catch (_) {}
+  }
+  return null;
+}
 
-      <div class="muted" id="link"></div>
+export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    res.status(405).end();
+    return;
+  }
 
-      <!-- Tabs -->
-      <div class="row two" style="margin-top: 12px;">
-        <button id="tabTx" class="secondary" type="button">Transactions</button>
-        <button id="tabErc20" class="secondary" type="button">ERC-20 Transfers</button>
-      </div>
-
-      <!-- Output -->
-      <div id="output"></div>
-
-      <div class="muted">Farcaster Mini App • Base Network</div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
-  <script type="module" src="/sdk.js"></script>
-  <script type="module" src="/app.js"></script>
-
-  <!-- Gas Tracker Logic -->
-  <script>
-    async function updateGasDisplay() {
-      try {
-        const res = await fetch('/api/gas');
-        const data = await res.json();
-
-        if (data?.safe == null || data?.fast == null || data?.rapid == null) {
-          throw new Error('Invalid gas data');
-        }
-
-        const safe = Number(data.safe).toFixed(2);
-        const fast = Number(data.fast).toFixed(2);
-        const rapid = Number(data.rapid).toFixed(2);
-
-        let usdLine = '';
-        if (data.ethUsd && data.estimates?.erc20?.safeUsd) {
-          const safeUsd = data.estimates.erc20.safeUsd.toFixed(4);
-          usdLine = ` • ERC-20: ~$${safeUsd}`;
-        }
-
-        document.getElementById('gasTracker').innerHTML = `
-          Gas (Gwei): Safe ${safe} • Fast ${fast} • Rapid ${rapid}${usdLine}
-        `;
-      } catch (e) {
-        document.getElementById('gasTracker').textContent = 'Gas: —';
-      }
+  try {
+    // gas price
+    const { result: gasHex } = await rpcTry("eth_gasPrice");
+    const gasWei = hexToBigInt(gasHex);
+    const baseGwei = weiToGwei(gasWei);
+    if (!Number.isFinite(baseGwei)) {
+      throw new Error("Invalid gas price from RPC");
     }
 
-    // Load gas on startup
-    updateGasDisplay();
-    // Refresh every 12 seconds
-    setInterval(updateGasDisplay, 12000);
-  </script>
-</body>
-</html>
+    // latest block
+    const { result: block } = await rpcTry("eth_getBlockByNumber", [
+      "latest",
+      false,
+    ]);
+
+    const lastBlock = block?.number
+      ? Number(hexToBigInt(block.number))
+      : null;
+
+    const gasUsed = block?.gasUsed ? hexToBigInt(block.gasUsed) : null;
+    const gasLimit = block?.gasLimit ? hexToBigInt(block.gasLimit) : null;
+
+    let gasUsedRatio = null;
+    if (gasUsed && gasLimit && gasLimit > 0n) {
+      const ratio = Number(gasUsed) / Number(gasLimit);
+      if (Number.isFinite(ratio)) gasUsedRatio = ratio;
+    }
+
+    // tiers (mirip BaseScan)
+    const safe = baseGwei;
+    const fast = baseGwei * 1.15;
+    const rapid = baseGwei * 1.25;
+
+    // ETH price
+    const ethUsd = await fetchEthUsd();
+
+    res.setHeader(
+      "Cache-Control",
+      "s-maxage=5, stale-while-revalidate=30"
+    );
+
+    res.status(200).json({
+      chain: "base",
+      safe,
+      fast,
+      rapid,
+      lastBlock,
+      gasUsedRatio,
+      ethUsd,
+      source: "base-rpc",
+    });
+  } catch (e) {
+    res.status(500).json({
+      error: {
+        message: e?.message || String(e),
+      },
+    });
+  }
+}
