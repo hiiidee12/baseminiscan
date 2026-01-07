@@ -1,19 +1,19 @@
 {
   "accountAssociation": {
-    "header": "REPLACE_ME",
-    "payload": "REPLACE_ME",
-    "signature": "REPLACE_ME"
+    "header": "eyJmaWQiOjI5MTA0OSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDMyNjhkMEYyNjMxOTA3RTU2ZjQxYTJCM2M4NDZlMUNiODA0YWZiYzAifQ",
+    "payload": "eyJkb21haW4iOiJiYXNlbWluaXNjYW4udmVyY2VsLmFwcCJ9",
+    "signature": "2+UPZCrn9EVLlRF8GFNzHqoj68ACUbnDe4/wLqHOj6NmLjS8IqEbKNY17Y4KTl6wKAy6U9hfACZil9fTPOHTeRw="
   },
   "frame": {
     "name": "Base Mini Scan",
     "version": "1",
+    "splashImageUrl": "https://baseminiscan.vercel.app/assets/card.png",
+    "splashBackgroundColor": "#020617",
     "iconUrl": "https://baseminiscan.vercel.app/assets/icon.png",
     "homeUrl": "https://baseminiscan.vercel.app/",
     "imageUrl": "https://baseminiscan.vercel.app/assets/card.png",
-    "splashImageUrl": "https://baseminiscan.vercel.app/assets/card.png",
-    "splashBackgroundColor": "#020617",
     "subtitle": "Base explorer helper",
-    "description": "Quick lookup on BaseScan for address, tx, and blocks.",
+    "description": "Quick lookup on BaseScan for addresses, transactions, and blocks.",
     "primaryCategory": "utility",
     "tags": ["base", "basescan", "explorer"]
   }
