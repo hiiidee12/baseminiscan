@@ -1,75 +1,68 @@
-import sdk from "https://esm.sh/@farcaster/miniapp-sdk";
+import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
 
 window.__fcSdk = sdk;
-
-let resolveReady, rejectReady;
-window.__fcSdkReady = new Promise((res, rej) => {
-  resolveReady = res;
-  rejectReady = rej;
-});
 
 async function loadNeynarScore(fid) {
   const el = document.getElementById("neynarScore");
   if (!el || !fid) return;
 
   try {
-    const r = await fetch(`/api/neynar?fid=${encodeURIComponent(fid)}`);
-    const j = await r.json();
-    if (!r.ok || j?.error) {
+    const res = await fetch(`/api/neynar?fid=${encodeURIComponent(fid)}`);
+    const json = await res.json();
+
+    if (!res.ok || json?.error) {
       el.textContent = "Neynar: -";
       return;
     }
-    el.textContent =
-      typeof j.score === "number"
-        ? `Neynar: ${j.score.toFixed(2)}`
-        : "Neynar: -";
-  } catch {
+
+    const s = json?.score;
+    el.textContent = typeof s === "number" ? `Neynar: ${s.toFixed(2)}` : "Neynar: -";
+  } catch (e) {
     el.textContent = "Neynar: -";
   }
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
   try {
-    if (sdk.actions?.ready) await sdk.actions.ready();
-
     const inMiniApp = await sdk.isInMiniApp();
+
     if (!inMiniApp) {
-      const el = document.getElementById("fcName");
-      if (el) el.textContent = "Open in Farcaster client";
-      resolveReady(false);
+      const nameEl = document.getElementById("fcName");
+      if (nameEl) nameEl.textContent = "Open in Farcaster client";
       return;
     }
+
+    await sdk.actions.ready();
 
     const ctx = await sdk.context;
     const u = ctx?.user || {};
 
-    const setText = (id, v) => {
+    const setText = (id, text) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = v;
+      if (el) el.textContent = text;
     };
-    const setImg = (id, v) => {
+
+    const setImg = (id, src) => {
       const el = document.getElementById(id);
-      if (el) el.src = v || "";
+      if (el) el.src = src || "";
     };
 
     setText("fcName", u.displayName || "Farcaster User");
     setText("fcUser", u.username ? `@${u.username}` : "@-");
-    setText("fcFid", `FID: ${u.fid ?? "-"}`);
-    setImg("pfp", u.pfpUrl);
+    setText("fcFid", u.fid ? `FID: ${u.fid}` : "FID: -");
+    setImg("pfp", u.pfpUrl || "");
 
     if (u.fid) loadNeynarScore(u.fid);
 
-    const ins = ctx?.client?.safeAreaInsets;
-    if (ins) {
+    const insets = ctx?.client?.safeAreaInsets;
+    if (insets) {
       const wrap = document.getElementById("wrap");
       if (wrap) {
-        wrap.style.paddingTop = `calc(16px + ${ins.top || 0}px)`;
-        wrap.style.paddingBottom = `calc(16px + ${ins.bottom || 0}px)`;
+        wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
+        wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
       }
     }
-
-    resolveReady(true);
-  } catch (e) {
-    rejectReady(e);
+  } catch (err) {
+    console.warn("MiniApp SDK error:", err);
   }
 });
