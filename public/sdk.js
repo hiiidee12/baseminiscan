@@ -14,7 +14,8 @@ async function loadNeynarScore(fid) {
     }
 
     const s = json?.score;
-    el.textContent = typeof s === "number" ? `Neynar: ${s.toFixed(2)}` : "Neynar: -";
+    el.textContent =
+      typeof s === "number" ? `Neynar: ${s.toFixed(2)}` : "Neynar: -";
   } catch {
     el.textContent = "Neynar: -";
   }
@@ -60,11 +61,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     const u = ctx?.user || {};
 
     setText("fcName", u.displayName || "Farcaster User");
-    setText("fcFid", `FID: ${u.fid ?? "-"}`);
     setText("fcUser", u.username ? `@${u.username}` : "@-");
+    setText("fcFid", `FID: ${u.fid ?? "-"}`);
     setImg("pfp", u.pfpUrl || "");
 
-    if (u?.fid) loadNeynarScore(u.fid);
+    if (u?.fid) {
+      loadNeynarScore(u.fid);
+    }
 
     const insets = ctx?.client?.safeAreaInsets;
     if (insets) {
