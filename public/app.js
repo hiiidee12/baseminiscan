@@ -1,5 +1,3 @@
-// app.js
-
 const $ = (id) => document.getElementById(id);
 
 const isAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
@@ -38,24 +36,13 @@ function setActiveTab(tab) {
   const tx = $("tabTx");
   const erc = $("tabErc20");
   const gas = $("gas");
-  if (!tx || !erc || !gas) return;
+  if (tx) tx.classList.add("secondary");
+  if (erc) erc.classList.add("secondary");
+  if (gas) gas.classList.add("secondary");
 
-  const on = (btn) => btn.classList.remove("secondary");
-  const off = (btn) => btn.classList.add("secondary");
-
-  if (tab === "tx") {
-    on(tx);
-    off(erc);
-    off(gas);
-  } else if (tab === "erc20") {
-    off(tx);
-    on(erc);
-    off(gas);
-  } else {
-    off(tx);
-    off(erc);
-    on(gas);
-  }
+  if (tab === "tx" && tx) tx.classList.remove("secondary");
+  if (tab === "erc20" && erc) erc.classList.remove("secondary");
+  if (tab === "gas" && gas) gas.classList.remove("secondary");
 }
 
 function renderOverview(address, balanceWei) {
@@ -89,7 +76,7 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list) {
-  const rows = list
+  const rows = (list || [])
     .slice(0, 25)
     .map((tx) => {
       const hash = tx.hash || tx.transactionHash || "-";
@@ -137,7 +124,7 @@ function renderTxTable(list) {
 }
 
 function renderErc20Table(list) {
-  const rows = list
+  const rows = (list || [])
     .slice(0, 25)
     .map((t) => {
       const hash = t.hash || t.transactionHash || "-";
@@ -194,35 +181,16 @@ function renderErc20Table(list) {
   `;
 }
 
-async function loadAddressView(address, tab = "tx") {
-  setActiveTab(tab);
-  $("output").innerHTML = `<div class="muted">Loading ${
-    tab === "tx" ? "transactions" : "ERC-20 transfers"
-  }…</div>`;
-
-  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(
-    tab
-  )}&offset=25&page=1`;
-
-  const res = await fetch(url);
-  const json = await res.json();
-
-  if (!res.ok || json?.error) {
-    $("output").innerHTML = `<pre>${JSON.stringify(json, null, 2)}</pre>`;
-    return;
-  }
-
-  const overview = renderOverview(address, json.balanceWei);
-  const table = tab === "erc20" ? renderErc20Table(json.list) : renderTxTable(json.list);
-
-  $("output").innerHTML = overview + table;
-
-  $("output").querySelectorAll("[data-open]").forEach((el) => {
+function bindOpenHandlers(scopeEl) {
+  if (!scopeEl) return;
+  scopeEl.querySelectorAll("[data-open]").forEach((el) => {
     el.addEventListener("click", () => openExternal(el.getAttribute("data-open")));
   });
 }
 
-/* ---------------- GAS TRACKER ---------------- */
+/* =========================
+   GAS (expects /api/gas)
+   ========================= */
 
 let __gasTimer = null;
 
@@ -233,20 +201,24 @@ function fmtGwei(v) {
 }
 
 function gasUtilPercent(gasUsedRatio) {
-  if (gasUsedRatio == null) return "-";
   const n = Number(gasUsedRatio);
   if (!Number.isFinite(n)) return "-";
   return (n * 100).toFixed(2) + "%";
 }
 
-function feeUsd(ethUsd, gwei, gasUnits) {
-  const p = Number(ethUsd);
+function gweiToUsd(gwei, gasUnits, ethUsd) {
   const g = Number(gwei);
-  if (!Number.isFinite(p) || !Number.isFinite(g)) return "-";
-  const eth = g * 1e-9 * gasUnits;
-  const usd = eth * p;
-  if (!Number.isFinite(usd)) return "-";
-  return `$${usd.toFixed(3)}`;
+  const u = Number(gasUnits);
+  const p = Number(ethUsd);
+  if (!Number.isFinite(g) || !Number.isFinite(u) || !Number.isFinite(p)) return null;
+  const usd = (g * 1e-9) * u * p;
+  return usd;
+}
+
+function fmtUsd(n) {
+  if (!Number.isFinite(n)) return "-";
+  if (n < 0.01) return "< $0.01";
+  return `$${n.toFixed(n < 1 ? 2 : 3)}`;
 }
 
 function renderGas(g, nextSec) {
@@ -254,9 +226,12 @@ function renderGas(g, nextSec) {
   const fast = fmtGwei(g.fast);
   const rapid = fmtGwei(g.rapid);
 
-  const GAS_ERC20 = 65000;
-  const GAS_SWAP = 180000;
-  const GAS_LP = 220000;
+  const ethUsd = Number(g.ethUsd);
+  const hasPrice = Number.isFinite(ethUsd) && ethUsd > 0;
+
+  const lowUsd = hasPrice ? fmtUsd(gweiToUsd(g.safe, 21000, ethUsd)) : "-";
+  const avgUsd = hasPrice ? fmtUsd(gweiToUsd(g.fast, 120000, ethUsd)) : "-";
+  const highUsd = hasPrice ? fmtUsd(gweiToUsd(g.rapid, 180000, ethUsd)) : "-";
 
   return `
     <div class="gasWrap">
@@ -269,25 +244,24 @@ function renderGas(g, nextSec) {
         <div class="gasCard">
           <div class="gasCardHead"><div class="gasEmoji">🙂</div> Standard</div>
           <div class="gasValue standard">${standard} Gwei</div>
-          <div class="gasSub">&lt; $0.01 | ~ 12–16 secs</div>
+          <div class="gasSub">${hasPrice ? lowUsd : ""} ~ 12–16 secs</div>
         </div>
 
         <div class="gasCard">
           <div class="gasCardHead"><div class="gasEmoji">😄</div> Fast</div>
           <div class="gasValue fast">${fast} Gwei</div>
-          <div class="gasSub">&lt; $0.01 | ~ 6–8 secs</div>
+          <div class="gasSub">${hasPrice ? avgUsd : ""} ~ 6–8 secs</div>
         </div>
 
         <div class="gasCard center">
           <div class="gasCardHead"><div class="gasEmoji">🚀</div> Rapid</div>
           <div class="gasValue rapid">${rapid} Gwei</div>
-          <div class="gasSub">&lt; $0.01 | ~ 2–3 secs</div>
+          <div class="gasSub">${hasPrice ? highUsd : ""} ~ 2–3 secs</div>
         </div>
       </div>
 
       <div class="resultCard" style="padding:14px;">
         <div style="font-weight:800;margin-bottom:10px;">Additional Info</div>
-
         <div class="gasInfoGrid">
           <div class="gasInfoCard">
             <div class="gasInfoLabel">LAST BLOCK</div>
@@ -299,82 +273,83 @@ function renderGas(g, nextSec) {
           </div>
         </div>
 
-        <div class="gasFoot">
-          ETH/USD: <b>${g.ethUsd ? `$${Number(g.ethUsd).toFixed(2)}` : "-"}</b> • Source: ${
-    g.source || "base-rpc"
-  }
+        <div class="gasMeta">
+          ${hasPrice ? `ETH/USD: $${ethUsd.toFixed(2)}` : ""}${hasPrice ? " • " : ""}Source: ${g.source ?? "-"}
         </div>
 
-        <div style="margin-top:14px;font-weight:800;">Featured Actions</div>
-        <div class="gasActionTableWrap">
-          <table class="gasActionTable">
-            <thead>
-              <tr><th>Action</th><th>Low</th><th>Average</th><th>High</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>ERC-20 Transfer</td>
-                <td>${feeUsd(g.ethUsd, g.safe, GAS_ERC20)}</td>
-                <td>${feeUsd(g.ethUsd, g.fast, GAS_ERC20)}</td>
-                <td>${feeUsd(g.ethUsd, g.rapid, GAS_ERC20)}</td>
-              </tr>
-              <tr>
-                <td>Swap</td>
-                <td>${feeUsd(g.ethUsd, g.safe, GAS_SWAP)}</td>
-                <td>${feeUsd(g.ethUsd, g.fast, GAS_SWAP)}</td>
-                <td>${feeUsd(g.ethUsd, g.rapid, GAS_SWAP)}</td>
-              </tr>
-              <tr>
-                <td>Add/Remove LP</td>
-                <td>${feeUsd(g.ethUsd, g.safe, GAS_LP)}</td>
-                <td>${feeUsd(g.ethUsd, g.fast, GAS_LP)}</td>
-                <td>${feeUsd(g.ethUsd, g.rapid, GAS_LP)}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div style="font-weight:800;margin:14px 0 8px;">Featured Actions</div>
+        <div class="tableWrap">
+          <div class="tableScroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Low</th>
+                  <th>Average</th>
+                  <th>High</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="small">ERC-20 Transfer</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.safe, 65000, ethUsd)) : "-"}</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.fast, 65000, ethUsd)) : "-"}</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.rapid, 65000, ethUsd)) : "-"}</td>
+                </tr>
+                <tr>
+                  <td class="small">Swap</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.safe, 150000, ethUsd)) : "-"}</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.fast, 150000, ethUsd)) : "-"}</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.rapid, 150000, ethUsd)) : "-"}</td>
+                </tr>
+                <tr>
+                  <td class="small">Add/Remove LP</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.safe, 220000, ethUsd)) : "-"}</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.fast, 220000, ethUsd)) : "-"}</td>
+                  <td>${hasPrice ? fmtUsd(gweiToUsd(g.rapid, 220000, ethUsd)) : "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="gasFoot">Note: estimasi USD = (gwei × gasUnits) × ETH/USD</div>
+        <div class="muted" style="margin-top:10px;">
+          Note: estimasi USD = (gwei × gasUnits) × ETH/USD
+        </div>
       </div>
     </div>
   `;
 }
 
-async function loadGasOnce(nextSec = 60) {
-  $("output").innerHTML = `<div class="muted">Loading gas…</div>`;
-  try {
-    const r = await fetch("/api/gas", { cache: "no-store" });
+async function loadGasOnce(nextSec = 10) {
+  const out = $("output");
+  if (!out) return false;
 
-    const text = await r.text();
-    let j = null;
-    try {
-      j = JSON.parse(text);
-    } catch (e) {
-      throw new Error(`Gas API not JSON (HTTP ${r.status}).`);
-    }
+  out.innerHTML = `<div class="muted">Loading gas…</div>`;
+
+  try {
+    const r = await fetch("/api/gas");
+    const j = await r.json();
 
     if (!r.ok || j?.error) {
-      $("output").innerHTML = `<pre>${JSON.stringify(j, null, 2)}</pre>`;
+      out.innerHTML = `<pre>${JSON.stringify(j, null, 2)}</pre>`;
       return false;
     }
 
-    $("output").innerHTML = renderGas(j, nextSec);
+    out.innerHTML = renderGas(j, nextSec);
     return true;
   } catch (e) {
-    $("output").innerHTML = `<pre>${String(e?.message || e)}</pre>`;
+    out.innerHTML = `<pre>${String(e)}</pre>`;
     return false;
   }
 }
 
 function stopGasAutoRefresh() {
-  if (__gasTimer) {
-    clearInterval(__gasTimer);
-    __gasTimer = null;
-  }
+  if (__gasTimer) clearInterval(__gasTimer);
+  __gasTimer = null;
 }
 
 function startGasAutoRefresh() {
-  setActiveTab("gas");
   stopGasAutoRefresh();
 
   let next = 10;
@@ -384,7 +359,7 @@ function startGasAutoRefresh() {
     next -= 1;
 
     if (next <= 0) {
-      next = 60;
+      next = 10;
       await loadGasOnce(next);
     } else {
       const b = document.querySelector(".gasNext b");
@@ -393,66 +368,137 @@ function startGasAutoRefresh() {
   }, 1000);
 }
 
-/* ---------------- BUTTONS / TABS ---------------- */
+/* =========================
+   ADDRESS VIEW
+   ========================= */
 
-$("open").onclick = async () => {
+async function loadAddressView(address, tab = "tx") {
   stopGasAutoRefresh();
+  setActiveTab(tab);
 
-  const q = $("query").value.trim();
-  if (!q) return;
+  const out = $("output");
+  if (!out) return;
 
-  if (isAddress(q)) {
-    $("link").textContent = "";
-    await loadAddressView(q, "tx");
-    return;
-  }
+  out.innerHTML = `<div class="muted">Loading ${tab === "tx" ? "transactions" : "ERC-20 transfers"}…</div>`;
 
-  const url = makeBaseScanUrl(q);
-  $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-  await openExternal(url);
-};
+  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}&offset=25&page=1`;
+  let res, json;
 
-$("fetch").onclick = async () => {
-  stopGasAutoRefresh();
-
-  const q = $("query").value.trim();
-  if (!q) return;
-
-  if (isAddress(q)) {
-    await loadAddressView(q, "tx");
-    return;
-  }
-
-  $("output").innerHTML = `<div class="muted">Loading…</div>`;
   try {
-    const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    $("output").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    res = await fetch(url);
+    json = await res.json();
   } catch (e) {
-    $("output").innerHTML = `<pre>${e.toString()}</pre>`;
+    out.innerHTML = `<pre>${String(e)}</pre>`;
+    return;
   }
-};
 
-$("tabTx").onclick = async () => {
-  stopGasAutoRefresh();
+  if (!res.ok || json?.error) {
+    out.innerHTML = `<pre>${JSON.stringify(json, null, 2)}</pre>`;
+    return;
+  }
 
-  const q = $("query").value.trim();
-  if (!isAddress(q)) return;
-  await loadAddressView(q, "tx");
-};
+  const overview = renderOverview(address, json.balanceWei);
+  const table = tab === "erc20" ? renderErc20Table(json.list) : renderTxTable(json.list);
 
-$("tabErc20").onclick = async () => {
-  stopGasAutoRefresh();
-
-  const q = $("query").value.trim();
-  if (!isAddress(q)) return;
-  await loadAddressView(q, "erc20");
-};
-
-if ($("gas")) {
-  $("gas").onclick = () => startGasAutoRefresh();
+  out.innerHTML = overview + table;
+  bindOpenHandlers(out);
 }
 
-$("query").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("open").click();
+/* =========================
+   UI BINDING (fix loading/blank by waiting DOM)
+   ========================= */
+
+function safeOn(id, event, fn) {
+  const el = $(id);
+  if (!el) return;
+  el.addEventListener(event, fn);
+}
+
+function bindUI() {
+  safeOn("open", "click", async () => {
+    const qEl = $("query");
+    if (!qEl) return;
+    const q = qEl.value.trim();
+    if (!q) return;
+
+    if (isAddress(q)) {
+      const link = $("link");
+      if (link) link.textContent = "";
+      await loadAddressView(q, "tx");
+      return;
+    }
+
+    stopGasAutoRefresh();
+
+    const url = makeBaseScanUrl(q);
+    const link = $("link");
+    if (link) link.innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+    await openExternal(url);
+  });
+
+  safeOn("fetch", "click", async () => {
+    const qEl = $("query");
+    const out = $("output");
+    if (!qEl || !out) return;
+
+    const q = qEl.value.trim();
+    if (!q) return;
+
+    if (isAddress(q)) {
+      await loadAddressView(q, "tx");
+      return;
+    }
+
+    stopGasAutoRefresh();
+    out.innerHTML = `<div class="muted">Loading…</div>`;
+
+    try {
+      const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    } catch (e) {
+      out.innerHTML = `<pre>${String(e)}</pre>`;
+    }
+  });
+
+  safeOn("tabTx", "click", async () => {
+    const qEl = $("query");
+    if (!qEl) return;
+    const q = qEl.value.trim();
+    if (!isAddress(q)) return;
+    await loadAddressView(q, "tx");
+  });
+
+  safeOn("tabErc20", "click", async () => {
+    const qEl = $("query");
+    if (!qEl) return;
+    const q = qEl.value.trim();
+    if (!isAddress(q)) return;
+    await loadAddressView(q, "erc20");
+  });
+
+  safeOn("gas", "click", async () => {
+    setActiveTab("gas");
+    startGasAutoRefresh();
+  });
+
+  const qEl = $("query");
+  if (qEl) {
+    qEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const btn = $("open");
+        if (btn) btn.click();
+      }
+    });
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  try {
+    bindUI();
+  } catch (e) {
+    const out = $("output");
+    if (out) out.innerHTML = `<pre>${String(e)}</pre>`;
+  }
 });
+```0
