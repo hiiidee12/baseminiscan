@@ -29,7 +29,9 @@ async function openExternal(url) {
       return;
     }
   } catch (e) {}
-  window.open(url, "_blank", "noopener,noreferrer");
+
+  // ✅ Fallback yang pasti jalan di Mini App webview & browser
+  window.location.href = url;
 }
 
 function setActiveTab(tab) {
