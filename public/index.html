@@ -5,14 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Base Mini Scan</title>
 
-  <!-- Open Graph -->
   <meta property="og:title" content="Base Mini Scan" />
   <meta property="og:description" content="Quick BaseScan lookup on Base Network." />
   <meta property="og:image" content="https://baseminiscan.vercel.app/assets/card.png" />
   <meta property="og:url" content="https://baseminiscan.vercel.app/" />
   <meta property="og:type" content="website" />
 
-  <!-- Twitter / Warpcast -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Base Mini Scan" />
   <meta name="twitter:description" content="Base Network explorer helper" />
@@ -24,21 +22,15 @@
 <body>
   <div class="wrap" id="wrap">
     <div class="card">
-      <!-- Farcaster user -->
+
       <div class="profile">
         <img id="pfp" class="pfp" alt="pfp" />
-
         <div class="profileInfo">
-          <!-- 1. Nama -->
           <div class="profileName" id="fcName">Loading…</div>
-
-          <!-- 2. Username -->
           <div class="profileUsername muted" id="fcUser">@-</div>
-
-          <!-- 3. FID + Neynar -->
           <div class="profileBadges">
             <span class="badge" id="fcFid">FID: -</span>
-            <span class="badge" id="neynarScore">Neynar: -</span>
+            <span class="badge neynar" id="neynarScore">Neynar: -</span>
           </div>
         </div>
       </div>
@@ -66,13 +58,11 @@
       <div id="output"></div>
 
       <div class="muted">Farcaster Mini App • Base Network</div>
+
     </div>
   </div>
 
-  <!-- Farcaster Mini App SDK -->
   <script type="module" src="/sdk.js"></script>
-
-  <!-- App logic -->
-  <script defer src="/app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>
