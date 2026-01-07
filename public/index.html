@@ -31,7 +31,9 @@
           <div class="profileTop">
             <b id="fcName">Loading…</b>
             <span class="badge" id="fcFid">FID: -</span>
-            <span class="badge" id="neynarScore" style="display:none;">Neynar: -</span>
+
+            <!-- ✅ Neynar badge JANGAN disembunyikan -->
+            <span class="badge" id="neynarScore">Neynar: -</span>
           </div>
           <div class="muted" id="fcUser">@-</div>
         </div>
@@ -49,7 +51,7 @@
         <button id="open">Open</button>
         <button id="fetch" class="secondary">Fetch</button>
 
-        <div class="tabRow">
+        <div class="tabs">
           <button id="tabTx" class="secondary">Transactions</button>
           <button id="tabErc20" class="secondary">ERC-20 Transfers</button>
           <button id="gas" class="secondary">Gas</button>
@@ -63,9 +65,10 @@
     </div>
   </div>
 
-  <!-- SDK dulu, baru app.js, baru gas.js -->
+  <!-- Farcaster Mini App SDK -->
   <script type="module" src="/sdk.js"></script>
-  <script src="/app.js" defer></script>
-  <script src="/gas.js" defer></script>
+
+  <!-- App logic -->
+  <script defer src="/app.js"></script>
 </body>
 </html>
