@@ -7,16 +7,16 @@
 
   <!-- Open Graph -->
   <meta property="og:title" content="Base Mini Scan" />
-  <meta property="og:description" content="Fast BaseScan lookup for address, transaction hash, and block on Base." />
-  <meta property="og:image" content="https://YOUR_DOMAIN/assets/card.png" />
-  <meta property="og:url" content="https://YOUR_DOMAIN/" />
+  <meta property="og:description" content="Quick BaseScan lookup on Base Network." />
+  <meta property="og:image" content="https://baseminiscan.vercel.app/assets/card.png" />
+  <meta property="og:url" content="https://baseminiscan.vercel.app/" />
   <meta property="og:type" content="website" />
 
   <!-- Twitter / Warpcast -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Base Mini Scan" />
   <meta name="twitter:description" content="Base Network explorer helper" />
-  <meta name="twitter:image" content="https://YOUR_DOMAIN/assets/card.png" />
+  <meta name="twitter:image" content="https://baseminiscan.vercel.app/assets/card.png" />
 
   <style>
     html, body {
@@ -185,7 +185,7 @@
 <body>
   <div class="wrap" id="wrap">
     <div class="card">
-      <!-- Auto-detected Farcaster user -->
+      <!-- Farcaster user -->
       <div class="profile">
         <img id="pfp" class="pfp" alt="pfp" />
         <div>
@@ -202,7 +202,7 @@
       <div class="row">
         <input
           id="query"
-          placeholder="0xabc... / 0xTxHash... / 12345678"
+          placeholder="Paste address / tx hash / block number"
           autocomplete="off"
         />
 
@@ -219,7 +219,7 @@
     </div>
   </div>
 
-  <!-- Logic -->
+  <!-- App logic -->
   <script>
     const $ = (id) => document.getElementById(id);
 
@@ -256,36 +256,51 @@
     };
   </script>
 
-  <!-- Farcaster Mini App SDK -->
+  <!-- Farcaster Mini App SDK (DOMContentLoaded + ready) -->
   <script type="module">
     import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
 
-    try {
-      const inMiniApp = await sdk.isInMiniApp();
-      if (!inMiniApp) {
-        document.getElementById("fcName").textContent = "Open in Farcaster client";
-        return;
+    window.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const inMiniApp = await sdk.isInMiniApp();
+        if (!inMiniApp) {
+          const el = document.getElementById("fcName");
+          if (el) el.textContent = "Open in Farcaster client";
+          return;
+        }
+
+        // ✅ BEST PRACTICE: notify Farcaster ASAP after DOM is ready
+        await sdk.actions.ready();
+
+        const ctx = await sdk.context;
+        const u = ctx?.user || {};
+
+        const setText = (id, text) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = text;
+        };
+        const setImg = (id, src) => {
+          const el = document.getElementById(id);
+          if (el) el.src = src || "";
+        };
+
+        setText("fcName", u.displayName || u.username || "Farcaster User");
+        setText("fcFid", `FID: ${u.fid ?? "-"}`);
+        setText("fcUser", u.username ? `@${u.username}` : "@-");
+        setImg("pfp", u.pfpUrl || "");
+
+        const insets = ctx?.client?.safeAreaInsets;
+        if (insets) {
+          const wrap = document.getElementById("wrap");
+          if (wrap) {
+            wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
+            wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
+          }
+        }
+      } catch (err) {
+        console.warn("MiniApp SDK error:", err);
       }
-
-      const ctx = await sdk.context;
-      const u = ctx?.user || {};
-
-      document.getElementById("fcName").textContent =
-        u.displayName || u.username || "Farcaster User";
-      document.getElementById("fcFid").textContent = `FID: ${u.fid ?? "-"}`;
-      document.getElementById("fcUser").textContent =
-        u.username ? `@${u.username}` : "@-";
-      document.getElementById("pfp").src = u.pfpUrl || "";
-
-      const insets = ctx?.client?.safeAreaInsets;
-      if (insets) {
-        const wrap = document.getElementById("wrap");
-        wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
-        wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
-      }
-    } catch (err) {
-      console.warn("MiniApp SDK error:", err);
-    }
+    });
   </script>
 </body>
 </html>
