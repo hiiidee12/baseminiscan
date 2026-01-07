@@ -5,7 +5,9 @@ async function loadNeynarScore(fid) {
   if (!el || !fid) return;
 
   try {
-    const res = await fetch(`/api/neynar?fid=${encodeURIComponent(fid)}`);
+    const res = await fetch(`/api/neynar?fid=${encodeURIComponent(fid)}`, {
+      cache: "no-store",
+    });
     const json = await res.json();
 
     if (!res.ok || json?.error) {
@@ -31,6 +33,45 @@ function setImg(id, src) {
   if (el) el.src = src || "";
 }
 
+async function isInMiniAppSafe(sdk) {
+  try {
+    if (typeof sdk?.isInMiniApp === "function") return await sdk.isInMiniApp();
+  } catch {}
+  try {
+    if (typeof sdk?.actions?.isInMiniApp === "function")
+      return await sdk.actions.isInMiniApp();
+  } catch {}
+  return false;
+}
+
+async function readySafe(sdk) {
+  try {
+    if (typeof sdk?.actions?.ready === "function") {
+      await sdk.actions.ready();
+      return true;
+    }
+  } catch {}
+  try {
+    if (typeof sdk?.ready === "function") {
+      await sdk.ready();
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+async function getContextSafe(sdk) {
+  try {
+    if (typeof sdk?.getContext === "function") return await sdk.getContext();
+  } catch {}
+  try {
+    const c = sdk?.context;
+    if (typeof c?.then === "function") return await c;
+    return c || null;
+  } catch {}
+  return null;
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   let sdk = null;
 
@@ -48,36 +89,30 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  try {
-    const inMiniApp = await sdk.isInMiniApp();
-    if (!inMiniApp) {
-      setText("fcName", "Open in Farcaster client");
-      return;
-    }
-
-    await sdk.actions.ready();
-
-    const ctx = await sdk.context;
-    const u = ctx?.user || {};
-
-    setText("fcName", u.displayName || "Farcaster User");
-    setText("fcUser", u.username ? `@${u.username}` : "@-");
-    setText("fcFid", `FID: ${u.fid ?? "-"}`);
-    setImg("pfp", u.pfpUrl || "");
-
-    if (u?.fid) {
-      loadNeynarScore(u.fid);
-    }
-
-    const insets = ctx?.client?.safeAreaInsets;
-    if (insets) {
-      const wrap = document.getElementById("wrap");
-      if (wrap) {
-        wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
-        wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
-      }
-    }
-  } catch {
+  const inMiniApp = await isInMiniAppSafe(sdk);
+  if (!inMiniApp) {
     setText("fcName", "Open in Farcaster client");
+    return;
+  }
+
+  await readySafe(sdk);
+
+  const ctx = await getContextSafe(sdk);
+  const u = ctx?.user || {};
+
+  setText("fcName", u.displayName || "Farcaster User");
+  setText("fcUser", u.username ? `@${u.username}` : "@-");
+  setText("fcFid", `FID: ${u.fid ?? "-"}`);
+  setImg("pfp", u.pfpUrl || "");
+
+  if (u?.fid) loadNeynarScore(u.fid);
+
+  const insets = ctx?.client?.safeAreaInsets;
+  if (insets) {
+    const wrap = document.getElementById("wrap");
+    if (wrap) {
+      wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
+      wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
+    }
   }
 });
