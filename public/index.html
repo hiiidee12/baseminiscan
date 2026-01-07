@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Base Mini Scan</title>
+  <meta name="description" content="Fast Base explorer mini app for addresses, transactions, and blocks." />
+
+  <!-- Farcaster Mini App Embed (IMPORTANT for Embed Tool) -->
+  <meta property="fc:miniapp" content="true" />
+  <meta property="fc:miniapp:name" content="Base Mini Scan" />
+  <meta property="fc:miniapp:url" content="https://baseminiscan.vercel.app/" />
+  <meta property="fc:miniapp:icon" content="https://baseminiscan.vercel.app/assets/icon.png" />
+  <meta property="fc:miniapp:image" content="https://baseminiscan.vercel.app/assets/card.png" />
+  <meta property="fc:miniapp:button" content="Open Mini App" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="Base Mini Scan" />
@@ -117,6 +126,11 @@
       border: 1px solid rgba(255,255,255,.4);
     }
 
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     .muted {
       font-size: 12px;
       color: rgba(255,255,255,.7);
@@ -179,6 +193,15 @@
       background: rgba(255,255,255,0.22);
       border: 1px solid rgba(255,255,255,0.30);
     }
+
+    .resultCard {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      backdrop-filter: blur(18px);
+    }
   </style>
 </head>
 
@@ -213,11 +236,15 @@
       <div class="muted" id="link"></div>
       <div id="output"></div>
 
-      <div class="muted">
-        Farcaster Mini App • Base Network
-      </div>
+      <div class="muted">Farcaster Mini App • Base Network</div>
     </div>
   </div>
+
+  <!-- Farcaster SDK loader (expose sdk for non-module scripts) -->
+  <script type="module">
+    import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
+    window.__fcSdk = sdk;
+  </script>
 
   <!-- App logic -->
   <script>
@@ -234,29 +261,82 @@
       return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
     }
 
-    $("open").onclick = () => {
+    function weiToEth(wei) {
+      const n = Number(wei);
+      if (!Number.isFinite(n)) return null;
+      return (n / 1e18).toFixed(6);
+    }
+
+    async function openExternal(url) {
+      try {
+        if (window.__fcSdk && await window.__fcSdk.isInMiniApp()) {
+          // ✅ prevents "refused to connect" (opens outside embed)
+          await window.__fcSdk.actions.openUrl(url);
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    $("open").onclick = async () => {
       const q = $("query").value.trim();
       if (!q) return;
+
       const url = makeBaseScanUrl(q);
-      $("link").innerHTML = `Link: <a href="${url}" target="_blank">${url}</a>`;
-      window.location.href = url;
+      $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+      await openExternal(url);
     };
 
     $("fetch").onclick = async () => {
       const q = $("query").value.trim();
       if (!q) return;
-      $("output").innerHTML = `<div class="muted">Loading...</div>`;
+
+      $("output").innerHTML = `<div class="muted">Loading…</div>`;
+
       try {
         const res = await fetch(`/api/basescan?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        $("output").innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        const json = await res.json();
+
+        // API wrapper format: { q, chain, data }
+        const status = json?.data?.status;
+        const msg = json?.data?.message;
+        const result = json?.data?.result;
+
+        if (status !== "1") {
+          throw new Error(msg || "API error");
+        }
+
+        // Nice display for address balance
+        if (isAddress(q)) {
+          const eth = weiToEth(result);
+          $("output").innerHTML = `
+            <div class="resultCard">
+              <div class="badge">Type: Address</div>
+              <div style="margin-top:10px;font-size:14px;">
+                Balance: <b>${eth ?? result} ETH</b> (Base)
+              </div>
+              <div class="muted" style="margin-top:8px;">Raw: ${result} wei</div>
+            </div>
+          `;
+          return;
+        }
+
+        // Default: show JSON
+        $("output").innerHTML = `<pre>${JSON.stringify(json, null, 2)}</pre>`;
       } catch (e) {
         $("output").innerHTML = `<pre>${e.toString()}</pre>`;
       }
     };
+
+    // Press Enter to open
+    $("query").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") $("open").click();
+    });
   </script>
 
-  <!-- Farcaster Mini App SDK (DOMContentLoaded + ready) -->
+  <!-- Farcaster Mini App SDK (DOMContentLoaded + ready + user context) -->
   <script type="module">
     import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
 
@@ -269,7 +349,7 @@
           return;
         }
 
-        // ✅ BEST PRACTICE: notify Farcaster ASAP after DOM is ready
+        // ✅ notify Farcaster after DOM is ready
         await sdk.actions.ready();
 
         const ctx = await sdk.context;
