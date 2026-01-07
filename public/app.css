@@ -1,7 +1,8 @@
 /* =========================
-   GLOBAL / RESET
+   BASE RESET + SCROLL FIX
 ========================= */
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
@@ -14,7 +15,7 @@ html, body {
 }
 
 /* =========================
-   BACKGROUND (Base Blue)
+   BACKGROUND
 ========================= */
 body {
   background:
@@ -37,8 +38,6 @@ body {
 .wrap {
   min-height: 100dvh;
   padding: 16px;
-
-  /* ❗ penting: jangan flex-center */
   display: block;
 }
 
@@ -46,27 +45,24 @@ body {
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
+  padding: 22px;
 
   background: linear-gradient(
     180deg,
     rgba(255,255,255,0.28),
     rgba(255,255,255,0.08)
   );
-
   backdrop-filter: blur(32px) saturate(180%);
   -webkit-backdrop-filter: blur(32px) saturate(180%);
-
   border-radius: 26px;
   border: 1px solid rgba(255,255,255,0.35);
-  padding: 22px;
-
   box-shadow:
     0 30px 80px rgba(0,60,180,.45),
     inset 0 1px 0 rgba(255,255,255,.45);
 }
 
 /* =========================
-   TYPOGRAPHY
+   TEXT & CONTROLS
 ========================= */
 h1 {
   font-size: 22px;
@@ -74,16 +70,9 @@ h1 {
   letter-spacing: .4px;
 }
 
-/* =========================
-   FORM / BUTTONS
-========================= */
 .row {
   display: grid;
   gap: 14px;
-}
-
-.row.two {
-  grid-template-columns: 1fr 1fr;
 }
 
 input {
@@ -109,9 +98,7 @@ button {
   font-weight: 600;
   color: #fff;
   cursor: pointer;
-
   background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
-
   box-shadow:
     0 14px 40px rgba(37,99,235,.65),
     inset 0 1px 0 rgba(255,255,255,.35);
@@ -123,14 +110,6 @@ button.secondary {
   border: 1px solid rgba(255,255,255,.4);
 }
 
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* =========================
-   TEXT / HELPERS
-========================= */
 .muted {
   font-size: 12px;
   color: rgba(255,255,255,.7);
@@ -143,32 +122,18 @@ a {
   word-break: break-all;
 }
 
-.small {
-  font-size: 11px;
-  color: rgba(255,255,255,.7);
-}
-
-.click {
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: rgba(255,255,255,.35);
-}
-
 /* =========================
-   FARCASTER PROFILE
+   PROFILE
 ========================= */
 .profile {
   display: flex;
   gap: 12px;
   align-items: center;
-
   padding: 12px;
   border-radius: 18px;
-
   background: rgba(255,255,255,0.16);
   border: 1px solid rgba(255,255,255,0.28);
   backdrop-filter: blur(18px);
-
   margin-bottom: 14px;
 }
 
@@ -177,7 +142,6 @@ a {
   height: 44px;
   border-radius: 50%;
   object-fit: cover;
-
   border: 1px solid rgba(255,255,255,.35);
   background: rgba(255,255,255,0.18);
 }
@@ -194,50 +158,47 @@ a {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-
   background: rgba(255,255,255,0.22);
   border: 1px solid rgba(255,255,255,0.30);
 }
 
 /* =========================
-   RESULT / TABLE
+   TABLE (RAPI + SCROLL)
 ========================= */
-.resultCard {
-  margin-top: 14px;
-  padding: 12px;
-  border-radius: 18px;
-
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.22);
-  backdrop-filter: blur(18px);
-}
-
 .tableWrap {
   margin-top: 14px;
   border-radius: 18px;
   overflow: hidden;
-
   border: 1px solid rgba(255,255,255,0.22);
   background: rgba(255,255,255,0.10);
 }
 
+.tableScroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
+  min-width: 680px;
   border-collapse: collapse;
   font-size: 12px;
 }
 
-th, td {
+th,
+td {
   padding: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.12);
+  white-space: nowrap;
   vertical-align: top;
 }
 
 th {
   text-align: left;
   font-weight: 700;
-  color: rgba(255,255,255,0.85);
   background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.85);
 }
 
 td {
@@ -245,20 +206,25 @@ td {
 }
 
 /* =========================
-   CODE / RAW JSON
+   MOBILE TUNING
 ========================= */
-pre {
-  margin-top: 16px;
-  padding: 14px;
+@media (max-width: 420px) {
+  .card {
+    padding: 18px;
+    border-radius: 22px;
+  }
 
-  background: rgba(10,20,40,.7);
-  border: 1px solid rgba(255,255,255,.3);
-  border-radius: 18px;
+  h1 {
+    font-size: 20px;
+  }
 
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #eaf1ff;
+  table {
+    font-size: 11px;
+    min-width: 720px;
+  }
 
-  backdrop-filter: blur(14px);
+  th,
+  td {
+    padding: 9px;
+  }
 }
