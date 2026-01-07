@@ -24,7 +24,7 @@ function weiToEthStr(wei, decimals = 6) {
 
 async function openExternal(url) {
   try {
-    if (window.__fcSdk && await window.__fcSdk.isInMiniApp()) {
+    if (window.__fcSdk && (await window.__fcSdk.isInMiniApp())) {
       await window.__fcSdk.actions.openUrl(url);
       return;
     }
@@ -77,100 +77,120 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list) {
-  const rows = list.slice(0, 25).map((tx) => {
-    const hash = tx.hash || tx.transactionHash || "-";
-    const from = tx.from || "-";
-    const to = tx.to || "-";
-    const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
-    const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
-    const block = tx.blockNumber || "-";
+  const rows = list
+    .slice(0, 25)
+    .map((tx) => {
+      const hash = tx.hash || tx.transactionHash || "-";
+      const from = tx.from || "-";
+      const to = tx.to || "-";
+      const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
+      const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
+      const block = tx.blockNumber || "-";
 
-    return `
+      return `
       <tr>
-        <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span><div class="small">Block ${block}</div></td>
+        <td>
+          <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
+          <div class="small">Block ${block}</div>
+        </td>
         <td class="small">${age}</td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
         <td>${valueEth}</td>
       </tr>
     `;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Txn Hash</th>
-            <th>Age</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Value (ETH)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows || `<tr><td colspan="5" class="small">No transactions found.</td></tr>`}
-        </tbody>
-      </table>
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Txn Hash</th>
+              <th>Age</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Value (ETH)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="5" class="small">No transactions found.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
 
 function renderErc20Table(list) {
-  const rows = list.slice(0, 25).map((t) => {
-    const hash = t.hash || t.transactionHash || "-";
-    const token = t.tokenSymbol || "-";
-    const tokenName = t.tokenName || token;
-    const from = t.from || "-";
-    const to = t.to || "-";
-    const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
+  const rows = list
+    .slice(0, 25)
+    .map((t) => {
+      const hash = t.hash || t.transactionHash || "-";
+      const token = t.tokenSymbol || "-";
+      const tokenName = t.tokenName || token;
+      const from = t.from || "-";
+      const to = t.to || "-";
+      const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
 
-    const dec = Number(t.tokenDecimal || "0");
-    const raw = t.value || "0";
-    let amount = raw;
-    const n = Number(raw);
-    if (Number.isFinite(n) && dec >= 0 && dec <= 18) {
-      amount = (n / Math.pow(10, dec)).toFixed(6);
-    }
+      const dec = Number(t.tokenDecimal || "0");
+      const raw = t.value || "0";
+      let amount = raw;
+      const n = Number(raw);
+      if (Number.isFinite(n) && dec >= 0 && dec <= 18) {
+        amount = (n / Math.pow(10, dec)).toFixed(6);
+      }
 
-    return `
+      return `
       <tr>
         <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
         <td class="small">${age}</td>
-        <td><div><b>${token}</b></div><div class="small">${tokenName}</div></td>
+        <td>
+          <div><b>${token}</b></div>
+          <div class="small">${tokenName}</div>
+        </td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
         <td>${amount}</td>
       </tr>
     `;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Txn Hash</th>
-            <th>Age</th>
-            <th>Token</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows || `<tr><td colspan="6" class="small">No token transfers found.</td></tr>`}
-        </tbody>
-      </table>
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Txn Hash</th>
+              <th>Age</th>
+              <th>Token</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="6" class="small">No token transfers found.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
 
 async function loadAddressView(address, tab = "tx") {
   setActiveTab(tab);
-  $("output").innerHTML = `<div class="muted">Loading ${tab === "tx" ? "transactions" : "ERC-20 transfers"}…</div>`;
+  $("output").innerHTML = `<div class="muted">Loading ${
+    tab === "tx" ? "transactions" : "ERC-20 transfers"
+  }…</div>`;
 
-  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}&offset=25&page=1`;
+  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(
+    tab
+  )}&offset=25&page=1`;
   const res = await fetch(url);
   const json = await res.json();
 
@@ -241,3 +261,4 @@ $("tabErc20").onclick = async () => {
 $("query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("open").click();
 });
+```0
