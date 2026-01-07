@@ -17,7 +17,7 @@ async function loadNeynarScore(fid) {
 
     const s = json?.score;
     el.textContent = typeof s === "number" ? `Neynar: ${s.toFixed(2)}` : "Neynar: -";
-  } catch (e) {
+  } catch {
     el.textContent = "Neynar: -";
   }
 }
@@ -48,11 +48,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     };
 
     setText("fcName", u.displayName || "Farcaster User");
+    setText("fcFid", `FID: ${u.fid ?? "-"}`);
     setText("fcUser", u.username ? `@${u.username}` : "@-");
-    setText("fcFid", u.fid ? `FID: ${u.fid}` : "FID: -");
     setImg("pfp", u.pfpUrl || "");
 
-    if (u.fid) loadNeynarScore(u.fid);
+    if (u?.fid) {
+      loadNeynarScore(u.fid);
+    }
 
     const insets = ctx?.client?.safeAreaInsets;
     if (insets) {
@@ -64,5 +66,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   } catch (err) {
     console.warn("MiniApp SDK error:", err);
+    const nameEl = document.getElementById("fcName");
+    if (nameEl) nameEl.textContent = "SDK not ready";
   }
 });
