@@ -345,7 +345,6 @@ async function loadGasOnce(nextSec = 10) {
   try {
     const r = await fetch("/api/gas", { cache: "no-store" });
 
-    // kalau /api/gas balik HTML/404, r.json() akan error -> sebelumnya bikin "loading terus"
     const text = await r.text();
     let j = null;
     try {
@@ -457,4 +456,3 @@ if ($("gas")) {
 $("query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("open").click();
 });
-```0
