@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   try {
     const address = (req.query.address || "").toString().trim();
-    const tab = (req.query.tab || "tx").toString().trim(); // "tx" | "erc20"
+    const tab = (req.query.tab || "tx").toString().trim(); // tx | erc20
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
     const offset = Math.min(25, Math.max(1, parseInt(req.query.offset || "25", 10)));
 
@@ -10,13 +10,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid address" });
     }
 
-    const apiKey = process.env.BASESCAN_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "Missing BASESCAN_API_KEY" });
+    // === MULTI API KEY (ROUND / FALLBACK) ===
+    const API_KEYS = [
+      process.env.ETHERSCAN_API_KEY,
+      process.env.ETHERSCAN_KEY_2,
+    ].filter(Boolean);
+
+    if (API_KEYS.length === 0) {
+      return res.status(500).json({ error: "Missing Etherscan API key(s)" });
     }
 
-    // Etherscan API V2 (Multichain)
-    // Base chainId = 8453
+    // Simple random pick (good enough for load spreading)
+    const pickKey = () =>
+      API_KEYS[Math.floor(Math.random() * API_KEYS.length)];
+
     const API = "https://api.etherscan.io/v2/api";
 
     const qs = (params) =>
@@ -24,62 +31,76 @@ export default async function handler(req, res) {
         .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
         .join("&");
 
-    // --- Balance ---
-    const balanceUrl =
-      `${API}?` +
-      qs({
-        chainid: 8453,
-        module: "account",
-        action: "balance",
-        address,
-        tag: "latest",
-        apikey: apiKey,
-      });
-
-    // --- Transactions or ERC20 Transfers ---
     const listAction = tab === "erc20" ? "tokentx" : "txlist";
 
-    const listUrl =
-      `${API}?` +
-      qs({
-        chainid: 8453,
-        module: "account",
-        action: listAction,
-        address,
-        page,
-        offset,
-        sort: "desc",
-        apikey: apiKey,
-      });
+    const fetchWithKey = async () => {
+      const apikey = pickKey();
 
-    // Fetch both in parallel
-    const [balanceRes, listRes] = await Promise.all([
-      fetch(balanceUrl),
-      fetch(listUrl),
-    ]);
+      const balanceUrl =
+        `${API}?` +
+        qs({
+          chainid: 8453,
+          module: "account",
+          action: "balance",
+          address,
+          tag: "latest",
+          apikey,
+        });
 
-    const balanceJson = await balanceRes.json();
-    const listJson = await listRes.json();
+      const listUrl =
+        `${API}?` +
+        qs({
+          chainid: 8453,
+          module: "account",
+          action: listAction,
+          address,
+          page,
+          offset,
+          sort: "desc",
+          apikey,
+        });
 
-    // Handle API errors
-    if (balanceJson?.status !== "1") {
+      const [balanceRes, listRes] = await Promise.all([
+        fetch(balanceUrl),
+        fetch(listUrl),
+      ]);
+
+      const balanceJson = await balanceRes.json();
+      const listJson = await listRes.json();
+
+      return { balanceJson, listJson };
+    };
+
+    // === TRY 2x (kalau key pertama kena limit) ===
+    let balanceJson, listJson;
+    for (let i = 0; i < API_KEYS.length; i++) {
+      const r = await fetchWithKey();
+      if (r.balanceJson?.status === "1") {
+        balanceJson = r.balanceJson;
+        listJson = r.listJson;
+        break;
+      }
+    }
+
+    if (!balanceJson || balanceJson.status !== "1") {
       return res.status(502).json({
         error: "Balance API error",
-        message: balanceJson?.message,
         raw: balanceJson,
       });
     }
 
-    if (listJson?.status !== "1" && listJson?.message !== "No transactions found") {
+    if (
+      listJson?.status !== "1" &&
+      listJson?.message !== "No transactions found"
+    ) {
       return res.status(502).json({
         error: "List API error",
-        message: listJson?.message,
         raw: listJson,
       });
     }
 
-    // Cache for performance (Vercel edge-friendly)
-    res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate=60");
+    // Cache (PENTING buat limit)
+    res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=60");
 
     return res.status(200).json({
       address,
