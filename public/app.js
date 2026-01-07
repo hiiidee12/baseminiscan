@@ -1,3 +1,5 @@
+// app.js
+
 const $ = (id) => document.getElementById(id);
 
 const isAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
@@ -41,9 +43,19 @@ function setActiveTab(tab) {
   const on = (btn) => btn.classList.remove("secondary");
   const off = (btn) => btn.classList.add("secondary");
 
-  if (tab === "tx") { on(tx); off(erc); off(gas); }
-  else if (tab === "erc20") { off(tx); on(erc); off(gas); }
-  else { off(tx); off(erc); on(gas); }
+  if (tab === "tx") {
+    on(tx);
+    off(erc);
+    off(gas);
+  } else if (tab === "erc20") {
+    off(tx);
+    on(erc);
+    off(gas);
+  } else {
+    off(tx);
+    off(erc);
+    on(gas);
+  }
 }
 
 function renderOverview(address, balanceWei) {
@@ -77,15 +89,17 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list) {
-  const rows = list.slice(0, 25).map((tx) => {
-    const hash = tx.hash || tx.transactionHash || "-";
-    const from = tx.from || "-";
-    const to = tx.to || "-";
-    const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
-    const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
-    const block = tx.blockNumber || "-";
+  const rows = list
+    .slice(0, 25)
+    .map((tx) => {
+      const hash = tx.hash || tx.transactionHash || "-";
+      const from = tx.from || "-";
+      const to = tx.to || "-";
+      const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
+      const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
+      const block = tx.blockNumber || "-";
 
-    return `
+      return `
       <tr>
         <td>
           <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
@@ -97,7 +111,8 @@ function renderTxTable(list) {
         <td>${valueEth}</td>
       </tr>
     `;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div class="tableWrap">
@@ -122,33 +137,39 @@ function renderTxTable(list) {
 }
 
 function renderErc20Table(list) {
-  const rows = list.slice(0, 25).map((t) => {
-    const hash = t.hash || t.transactionHash || "-";
-    const token = t.tokenSymbol || "-";
-    const tokenName = t.tokenName || token;
-    const from = t.from || "-";
-    const to = t.to || "-";
-    const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
+  const rows = list
+    .slice(0, 25)
+    .map((t) => {
+      const hash = t.hash || t.transactionHash || "-";
+      const token = t.tokenSymbol || "-";
+      const tokenName = t.tokenName || token;
+      const from = t.from || "-";
+      const to = t.to || "-";
+      const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
 
-    const dec = Number(t.tokenDecimal || "0");
-    const raw = t.value || "0";
-    let amount = raw;
-    const n = Number(raw);
-    if (Number.isFinite(n) && dec >= 0 && dec <= 18) {
-      amount = (n / Math.pow(10, dec)).toFixed(6);
-    }
+      const dec = Number(t.tokenDecimal || "0");
+      const raw = t.value || "0";
+      let amount = raw;
+      const n = Number(raw);
+      if (Number.isFinite(n) && dec >= 0 && dec <= 18) {
+        amount = (n / Math.pow(10, dec)).toFixed(6);
+      }
 
-    return `
+      return `
       <tr>
         <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
         <td class="small">${age}</td>
-        <td><div><b>${token}</b></div><div class="small">${tokenName}</div></td>
+        <td>
+          <div><b>${token}</b></div>
+          <div class="small">${tokenName}</div>
+        </td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
         <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
         <td>${amount}</td>
       </tr>
     `;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div class="tableWrap">
@@ -175,9 +196,14 @@ function renderErc20Table(list) {
 
 async function loadAddressView(address, tab = "tx") {
   setActiveTab(tab);
-  $("output").innerHTML = `<div class="muted">Loading ${tab === "tx" ? "transactions" : "ERC-20 transfers"}…</div>`;
+  $("output").innerHTML = `<div class="muted">Loading ${
+    tab === "tx" ? "transactions" : "ERC-20 transfers"
+  }…</div>`;
 
-  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}&offset=25&page=1`;
+  const url = `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(
+    tab
+  )}&offset=25&page=1`;
+
   const res = await fetch(url);
   const json = await res.json();
 
@@ -217,7 +243,7 @@ function feeUsd(ethUsd, gwei, gasUnits) {
   const p = Number(ethUsd);
   const g = Number(gwei);
   if (!Number.isFinite(p) || !Number.isFinite(g)) return "-";
-  const eth = (g * 1e-9) * gasUnits;
+  const eth = g * 1e-9 * gasUnits;
   const usd = eth * p;
   if (!Number.isFinite(usd)) return "-";
   return `$${usd.toFixed(3)}`;
@@ -228,7 +254,6 @@ function renderGas(g, nextSec) {
   const fast = fmtGwei(g.fast);
   const rapid = fmtGwei(g.rapid);
 
-  // estimasi gas units (kira-kira)
   const GAS_ERC20 = 65000;
   const GAS_SWAP = 180000;
   const GAS_LP = 220000;
@@ -275,7 +300,9 @@ function renderGas(g, nextSec) {
         </div>
 
         <div class="gasFoot">
-          ETH/USD: <b>${g.ethUsd ? `$${Number(g.ethUsd).toFixed(2)}` : "-"}</b> • Source: ${g.source || "base-rpc"}
+          ETH/USD: <b>${g.ethUsd ? `$${Number(g.ethUsd).toFixed(2)}` : "-"}</b> • Source: ${
+    g.source || "base-rpc"
+  }
         </div>
 
         <div style="margin-top:14px;font-weight:800;">Featured Actions</div>
@@ -315,21 +342,41 @@ function renderGas(g, nextSec) {
 
 async function loadGasOnce(nextSec = 10) {
   $("output").innerHTML = `<div class="muted">Loading gas…</div>`;
-  const r = await fetch("/api/gas");
-  const j = await r.json();
+  try {
+    const r = await fetch("/api/gas", { cache: "no-store" });
 
-  if (!r.ok || j?.error) {
-    $("output").innerHTML = `<pre>${JSON.stringify(j, null, 2)}</pre>`;
+    // kalau /api/gas balik HTML/404, r.json() akan error -> sebelumnya bikin "loading terus"
+    const text = await r.text();
+    let j = null;
+    try {
+      j = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`Gas API not JSON (HTTP ${r.status}).`);
+    }
+
+    if (!r.ok || j?.error) {
+      $("output").innerHTML = `<pre>${JSON.stringify(j, null, 2)}</pre>`;
+      return false;
+    }
+
+    $("output").innerHTML = renderGas(j, nextSec);
+    return true;
+  } catch (e) {
+    $("output").innerHTML = `<pre>${String(e?.message || e)}</pre>`;
     return false;
   }
+}
 
-  $("output").innerHTML = renderGas(j, nextSec);
-  return true;
+function stopGasAutoRefresh() {
+  if (__gasTimer) {
+    clearInterval(__gasTimer);
+    __gasTimer = null;
+  }
 }
 
 function startGasAutoRefresh() {
   setActiveTab("gas");
-  if (__gasTimer) clearInterval(__gasTimer);
+  stopGasAutoRefresh();
 
   let next = 10;
   loadGasOnce(next);
@@ -350,6 +397,8 @@ function startGasAutoRefresh() {
 /* ---------------- BUTTONS / TABS ---------------- */
 
 $("open").onclick = async () => {
+  stopGasAutoRefresh();
+
   const q = $("query").value.trim();
   if (!q) return;
 
@@ -365,6 +414,8 @@ $("open").onclick = async () => {
 };
 
 $("fetch").onclick = async () => {
+  stopGasAutoRefresh();
+
   const q = $("query").value.trim();
   if (!q) return;
 
@@ -384,12 +435,16 @@ $("fetch").onclick = async () => {
 };
 
 $("tabTx").onclick = async () => {
+  stopGasAutoRefresh();
+
   const q = $("query").value.trim();
   if (!isAddress(q)) return;
   await loadAddressView(q, "tx");
 };
 
 $("tabErc20").onclick = async () => {
+  stopGasAutoRefresh();
+
   const q = $("query").value.trim();
   if (!isAddress(q)) return;
   await loadAddressView(q, "erc20");
@@ -402,3 +457,4 @@ if ($("gas")) {
 $("query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("open").click();
 });
+```0
