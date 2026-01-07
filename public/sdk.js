@@ -1,6 +1,4 @@
-import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
-
-window.__fcSdk = sdk;
+window.__fcSdk = null;
 
 async function loadNeynarScore(fid) {
   const el = document.getElementById("neynarScore");
@@ -22,13 +20,37 @@ async function loadNeynarScore(fid) {
   }
 }
 
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function setImg(id, src) {
+  const el = document.getElementById(id);
+  if (el) el.src = src || "";
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
+  let sdk = null;
+
+  try {
+    const mod = await import("https://esm.sh/@farcaster/miniapp-sdk");
+    sdk = mod?.sdk || mod?.default || null;
+  } catch {
+    sdk = null;
+  }
+
+  window.__fcSdk = sdk;
+
+  if (!sdk) {
+    setText("fcName", "Open in Farcaster client");
+    return;
+  }
+
   try {
     const inMiniApp = await sdk.isInMiniApp();
-
     if (!inMiniApp) {
-      const nameEl = document.getElementById("fcName");
-      if (nameEl) nameEl.textContent = "Open in Farcaster client";
+      setText("fcName", "Open in Farcaster client");
       return;
     }
 
@@ -37,24 +59,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     const ctx = await sdk.context;
     const u = ctx?.user || {};
 
-    const setText = (id, text) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = text;
-    };
-
-    const setImg = (id, src) => {
-      const el = document.getElementById(id);
-      if (el) el.src = src || "";
-    };
-
     setText("fcName", u.displayName || "Farcaster User");
     setText("fcFid", `FID: ${u.fid ?? "-"}`);
     setText("fcUser", u.username ? `@${u.username}` : "@-");
     setImg("pfp", u.pfpUrl || "");
 
-    if (u?.fid) {
-      loadNeynarScore(u.fid);
-    }
+    if (u?.fid) loadNeynarScore(u.fid);
 
     const insets = ctx?.client?.safeAreaInsets;
     if (insets) {
@@ -64,9 +74,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
       }
     }
-  } catch (err) {
-    console.warn("MiniApp SDK error:", err);
-    const nameEl = document.getElementById("fcName");
-    if (nameEl) nameEl.textContent = "SDK not ready";
+  } catch {
+    setText("fcName", "Open in Farcaster client");
   }
 });
