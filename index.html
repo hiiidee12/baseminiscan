@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,7 +7,7 @@
 
   <!-- Open Graph -->
   <meta property="og:title" content="BaseScan Finder" />
-  <meta property="og:description" content="Fast BaseScan lookup for address, tx hash, and block." />
+  <meta property="og:description" content="Fast BaseScan lookup for address, transaction hash, and block on Base." />
   <meta property="og:image" content="https://YOUR_DOMAIN/assets/card.png" />
   <meta property="og:url" content="https://YOUR_DOMAIN/" />
   <meta property="og:type" content="website" />
@@ -36,13 +36,14 @@
       background-size: 200% 200%;
       animation: bgMove 18s ease-in-out infinite;
     }
+
     @keyframes bgMove {
       0%   { background-position: 0% 50%; }
       50%  { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
 
-    /* Auto-fit mini app height */
+    /* Auto-fit Mini App height */
     .wrap {
       min-height: 100dvh;
       display: flex;
@@ -55,19 +56,38 @@
     .card {
       width: 100%;
       max-width: 720px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08));
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.28),
+        rgba(255,255,255,0.08)
+      );
       backdrop-filter: blur(32px) saturate(180%);
       -webkit-backdrop-filter: blur(32px) saturate(180%);
       border-radius: 26px;
       border: 1px solid rgba(255,255,255,0.35);
       padding: 22px;
-      box-shadow: 0 30px 80px rgba(0,60,180,.45), inset 0 1px 0 rgba(255,255,255,.45);
+      box-shadow:
+        0 30px 80px rgba(0,60,180,.45),
+        inset 0 1px 0 rgba(255,255,255,.45);
     }
 
-    h1 { font-size: 22px; margin: 0 0 10px; letter-spacing: .4px; }
-    p  { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.85); }
+    h1 {
+      font-size: 22px;
+      margin: 0 0 10px;
+      letter-spacing: .4px;
+    }
 
-    .row { display: grid; gap: 14px; }
+    p {
+      margin: 0 0 18px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(255,255,255,.85);
+    }
+
+    .row {
+      display: grid;
+      gap: 14px;
+    }
 
     input {
       padding: 15px 16px;
@@ -79,7 +99,10 @@
       outline: none;
       backdrop-filter: blur(16px);
     }
-    input::placeholder { color: rgba(255,255,255,.65); }
+
+    input::placeholder {
+      color: rgba(255,255,255,.65);
+    }
 
     button {
       padding: 15px 16px;
@@ -89,15 +112,26 @@
       font-weight: 600;
       color: #fff;
       cursor: pointer;
-      background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
-      box-shadow: 0 14px 40px rgba(37,99,235,.65), inset 0 1px 0 rgba(255,255,255,.35);
+      background: linear-gradient(
+        90deg,
+        #1d4ed8,
+        #2563eb,
+        #3b82f6
+      );
+      box-shadow:
+        0 14px 40px rgba(37,99,235,.65),
+        inset 0 1px 0 rgba(255,255,255,.35);
     }
+
     button.secondary {
       background: rgba(255,255,255,0.25);
       box-shadow: none;
       border: 1px solid rgba(255,255,255,.4);
     }
-    button:active { transform: translateY(1px); }
+
+    button:active {
+      transform: translateY(1px);
+    }
 
     .pill {
       display: inline-block;
@@ -109,8 +143,17 @@
       backdrop-filter: blur(10px);
     }
 
-    .muted { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 12px; }
-    a { color: #cfe1ff; text-decoration: none; word-break: break-all; }
+    .muted {
+      font-size: 12px;
+      color: rgba(255,255,255,.7);
+      margin-top: 12px;
+    }
+
+    a {
+      color: #cfe1ff;
+      text-decoration: none;
+      word-break: break-all;
+    }
 
     pre {
       margin-top: 16px;
@@ -125,7 +168,7 @@
       backdrop-filter: blur(14px);
     }
 
-    /* Mini profile header (auto-detect Farcaster user) */
+    /* Farcaster user profile */
     .profile {
       display: flex;
       gap: 12px;
@@ -135,9 +178,9 @@
       background: rgba(255,255,255,0.16);
       border: 1px solid rgba(255,255,255,0.28);
       backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
       margin-bottom: 14px;
     }
+
     .pfp {
       width: 44px;
       height: 44px;
@@ -146,12 +189,14 @@
       border: 1px solid rgba(255,255,255,.35);
       background: rgba(255,255,255,0.18);
     }
+
     .profileTop {
       display: flex;
       align-items: baseline;
       gap: 10px;
       flex-wrap: wrap;
     }
+
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -166,8 +211,8 @@
 <body>
   <div class="wrap" id="wrap">
     <div class="card">
-      <!-- Auto-detect user area -->
-      <div class="profile" id="profile">
+      <!-- Auto-detected Farcaster user -->
+      <div class="profile">
         <img id="pfp" class="pfp" alt="pfp" />
         <div>
           <div class="profileTop">
@@ -181,18 +226,23 @@
       <h1>BaseScan Finder</h1>
 
       <p>
-        Masukkan
+        Enter an
         <span class="pill">Address</span>,
-        <span class="pill">Tx Hash</span>,
-        atau
-        <span class="pill">Block</span>
-        untuk membuka BaseScan.
+        <span class="pill">Transaction Hash</span>,
+        or
+        <span class="pill">Block Number</span>
+        to open it on BaseScan.
       </p>
 
       <div class="row">
-        <input id="query" placeholder="0xabc... / 0xTxHash... / 12345678" autocomplete="off" />
-        <button id="open">Buka di BaseScan</button>
-        <button id="fetch" class="secondary">Ambil ringkasan (API)</button>
+        <input
+          id="query"
+          placeholder="0xabc... / 0xTxHash... / 12345678"
+          autocomplete="off"
+        />
+
+        <button id="open">Open on BaseScan</button>
+        <button id="fetch" class="secondary">Fetch summary (API)</button>
       </div>
 
       <div class="muted" id="link"></div>
@@ -204,6 +254,7 @@
     </div>
   </div>
 
+  <!-- Logic -->
   <script>
     const $ = (id) => document.getElementById(id);
 
@@ -222,7 +273,7 @@
       const q = $("query").value.trim();
       if (!q) return;
       const url = makeBaseScanUrl(q);
-      $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+      $("link").innerHTML = `Link: <a href="${url}" target="_blank">${url}</a>`;
       window.location.href = url;
     };
 
@@ -240,45 +291,35 @@
     };
   </script>
 
-  <!-- Auto-detect Farcaster user via Mini App SDK (no build) -->
+  <!-- Farcaster Mini App SDK -->
   <script type="module">
-    // Uses @farcaster/miniapp-sdk: sdk.isInMiniApp() + sdk.context.user.{fid,username,displayName,pfpUrl} 1
     import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
 
-    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
-    const setImg = (id, src) => { const el = document.getElementById(id); if (el) el.src = src || ""; };
-
     try {
-      const inMiniApp = await sdk.isInMiniApp(); // 2
-
+      const inMiniApp = await sdk.isInMiniApp();
       if (!inMiniApp) {
-        setText("fcName", "Open in Farcaster client");
-        setText("fcFid", "FID: -");
-        setText("fcUser", "@-");
-        setImg("pfp", "");
-      } else {
-        const ctx = await sdk.context; // 3
-        const u = ctx?.user || {};
+        document.getElementById("fcName").textContent = "Open in Farcaster client";
+        return;
+      }
 
-        setText("fcName", u.displayName || u.username || "Farcaster User");
-        setText("fcFid", `FID: ${u.fid ?? "-"}`);
-        setText("fcUser", u.username ? `@${u.username}` : "@-");
-        setImg("pfp", u.pfpUrl || "");
+      const ctx = await sdk.context;
+      const u = ctx?.user || {};
 
-        // Optional: gunakan safe area insets biar UI gak ketutup navbar
-        const insets = ctx?.client?.safeAreaInsets;
-        if (insets) {
-          const wrap = document.getElementById("wrap");
-          wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
-          wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
-        }
+      document.getElementById("fcName").textContent =
+        u.displayName || u.username || "Farcaster User";
+      document.getElementById("fcFid").textContent = `FID: ${u.fid ?? "-"}`;
+      document.getElementById("fcUser").textContent =
+        u.username ? `@${u.username}` : "@-";
+      document.getElementById("pfp").src = u.pfpUrl || "";
 
-        // Optional: auto-fill input dengan username user (biar gampang copy/paste)
-        // document.getElementById("query").value = u.username ? `@${u.username}` : "";
+      const insets = ctx?.client?.safeAreaInsets;
+      if (insets) {
+        const wrap = document.getElementById("wrap");
+        wrap.style.paddingTop = `calc(16px + ${insets.top || 0}px)`;
+        wrap.style.paddingBottom = `calc(16px + ${insets.bottom || 0}px)`;
       }
     } catch (err) {
       console.warn("MiniApp SDK error:", err);
-      setText("fcName", "MiniApp context unavailable");
     }
   </script>
 </body>
