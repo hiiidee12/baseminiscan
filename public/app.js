@@ -1,269 +1,220 @@
-/* =========================
-   GLOBAL RESET
-========================= */
-* {
-  box-sizing: border-box;
+const $ = (id) => document.getElementById(id);
+
+const isAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
+const isTx = (v) => /^0x[a-fA-F0-9]{64}$/.test(v);
+const isBlock = (v) => /^[0-9]{1,20}$/.test(v);
+
+function shortHex(h, a = 6, b = 4) {
+  if (!h || h.length < a + b + 2) return h || "-";
+  return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  min-height: 100%;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  color: #fff;
-  overflow-x: hidden;
-  overflow-y: auto;
+function makeBaseScanUrl(q) {
+  if (isTx(q)) return `https://basescan.org/tx/${q}`;
+  if (isAddress(q)) return `https://basescan.org/address/${q}`;
+  if (isBlock(q)) return `https://basescan.org/block/${q}`;
+  return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
 }
 
-/* =========================
-   BACKGROUND
-========================= */
-body {
-  background:
-    radial-gradient(900px 500px at 10% 10%, rgba(0,112,255,.55), transparent 40%),
-    radial-gradient(800px 500px at 90% 20%, rgba(80,160,255,.45), transparent 45%),
-    linear-gradient(180deg, #020617, #020b2a, #041e42);
-  background-size: 200% 200%;
-  animation: bgMove 18s ease-in-out infinite;
+function weiToEthStr(wei, decimals = 6) {
+  const n = Number(wei);
+  if (!Number.isFinite(n)) return null;
+  return (n / 1e18).toFixed(decimals);
 }
 
-@keyframes bgMove {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+async function openExternal(url) {
+  try {
+    if (window.__fcSdk && (await window.__fcSdk.isInMiniApp())) {
+      await window.__fcSdk.actions.openUrl(url);
+      return;
+    }
+  } catch (_) {}
+  window.location.href = url;
 }
 
-/* =========================
-   LAYOUT
-========================= */
-.wrap {
-  min-height: 100dvh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 16px;
-}
-
-.card {
-  width: 100%;
-  max-width: 720px;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.28),
-    rgba(255,255,255,0.08)
-  );
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border-radius: 26px;
-  border: 1px solid rgba(255,255,255,0.35);
-  padding: 20px;
-  box-shadow:
-    0 30px 80px rgba(0,60,180,.45),
-    inset 0 1px 0 rgba(255,255,255,.45);
-}
-
-/* =========================
-   PROFILE
-========================= */
-.profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.16);
-  border: 1px solid rgba(255,255,255,0.28);
-  backdrop-filter: blur(18px);
-  margin-bottom: 14px;
-}
-
-.pfp {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: rgba(255,255,255,0.18);
-  border: 1px solid rgba(255,255,255,.35);
-}
-
-.profileTop {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: baseline;
-}
-
-/* =========================
-   TYPOGRAPHY
-========================= */
-h1 {
-  margin: 8px 0 14px;
-  font-size: 22px;
-  letter-spacing: .3px;
-}
-
-.muted {
-  font-size: 12px;
-  color: rgba(255,255,255,.7);
-}
-
-.small {
-  font-size: 11px;
-  color: rgba(255,255,255,.7);
-}
-
-/* =========================
-   INPUT & BUTTONS
-========================= */
-.row {
-  display: grid;
-  gap: 12px;
-}
-
-.row.two {
-  grid-template-columns: 1fr 1fr;
-}
-
-@media (max-width: 420px) {
-  .row.two {
-    grid-template-columns: 1fr;
+function setActiveTab(tab) {
+  const tx = $("tabTx");
+  const erc = $("tabErc20");
+  if (!tx || !erc) return;
+  if (tab === "tx") {
+    tx.classList.remove("secondary");
+    erc.classList.add("secondary");
+  } else {
+    erc.classList.remove("secondary");
+    tx.classList.add("secondary");
   }
 }
 
-input {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.28);
-  border: 1px solid rgba(255,255,255,0.4);
-  color: #fff;
-  font-size: 14px;
-  outline: none;
-  backdrop-filter: blur(16px);
+function renderOverview(address, balanceWei) {
+  const eth = weiToEthStr(balanceWei, 6);
+  return `
+    <div class="resultCard">
+      <div class="badge">Address</div>
+      <div style="margin-top:10px;font-size:14px;">
+        <b class="click" data-open="${makeBaseScanUrl(address)}">${shortHex(address, 8, 6)}</b>
+      </div>
+      <div style="margin-top:10px;font-size:14px;">
+        Balance: <b>${eth ?? balanceWei} ETH</b> (Base)
+      </div>
+      <div class="muted" style="margin-top:8px;">Raw: ${balanceWei} wei</div>
+    </div>
+  `;
 }
 
-input::placeholder {
-  color: rgba(255,255,255,.65);
+function ageFromTs(ts) {
+  const t = Number(ts) * 1000;
+  if (!Number.isFinite(t)) return "-";
+  const diff = Date.now() - t;
+  const s = Math.max(0, Math.floor(diff / 1000));
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d > 0) return `${d}d ago`;
+  if (h > 0) return `${h}h ago`;
+  if (m > 0) return `${m}m ago`;
+  return `${s}s ago`;
 }
 
-button {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 20px;
-  border: none;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
-  box-shadow:
-    0 14px 40px rgba(37,99,235,.65),
-    inset 0 1px 0 rgba(255,255,255,.35);
+function renderTxTable(list) {
+  const rows = list.slice(0, 25).map((tx) => {
+    const hash = tx.hash || tx.transactionHash || "-";
+    const from = tx.from || "-";
+    const to = tx.to || "-";
+    const valueEth = weiToEthStr(tx.value || "0", 6) || "0.000000";
+    const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
+    const block = tx.blockNumber || "-";
+
+    return `
+      <tr>
+        <td>
+          <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
+          <div class="small">Block ${block}</div>
+        </td>
+        <td class="small">${age}</td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
+        <td>${valueEth}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <div class="tableWrap">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Txn Hash</th>
+              <th>Age</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Value (ETH)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="5" class="small">No transactions found.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
-button.secondary {
-  background: rgba(255,255,255,0.25);
-  box-shadow: none;
-  border: 1px solid rgba(255,255,255,.4);
+function renderErc20Table(list) {
+  const rows = list.slice(0, 25).map((t) => {
+    const hash = t.hash || t.transactionHash || "-";
+    const token = t.tokenSymbol || "-";
+    const from = t.from || "-";
+    const to = t.to || "-";
+    const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
+
+    return `
+      <tr>
+        <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
+        <td class="small">${age}</td>
+        <td><b>${token}</b><div class="small">${t.tokenName || token}</div></td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
+        <td>-</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <div class="tableWrap">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Txn Hash</th>
+              <th>Age</th>
+              <th>Token</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="6" class="small">No token transfers found.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
-/* =========================
-   RESULT CARD
-========================= */
-.resultCard {
-  margin-top: 16px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.16);
-  border: 1px solid rgba(255,255,255,0.28);
+async function loadAddressView(address, tab = "tx") {
+  setActiveTab(tab);
+  $("output").innerHTML = `<div class="muted">Loading…</div>`;
+
+  const res = await fetch(`/api/address?address=${encodeURIComponent(address)}&tab=${tab}`);
+  const json = await res.json();
+
+  if (!res.ok || json?.error) {
+    $("output").innerHTML = `<pre>${JSON.stringify(json, null, 2)}</pre>`;
+    return;
+  }
+
+  const overview = renderOverview(address, json.balanceWei);
+  const table = tab === "erc20" ? renderErc20Table(json.list) : renderTxTable(json.list);
+  $("output").innerHTML = overview + table;
+
+  $("output").querySelectorAll("[data-open]").forEach((el) =>
+    el.onclick = () => openExternal(el.getAttribute("data-open"))
+  );
 }
 
-/* =========================
-   TABLE
-========================= */
-.tableWrap {
-  margin-top: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(10,20,40,.6);
-}
+$("open").onclick = async () => {
+  const q = $("query").value.trim();
+  if (!q) return;
 
-.tableScroll {
-  max-height: 55vh;
-  overflow-y: auto;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
+  if (isAddress(q)) {
+    $("link").textContent = "";
+    await loadAddressView(q, "tx");
+    return;
+  }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 600px;
-}
+  const url = makeBaseScanUrl(q);
+  $("link").innerHTML = `Link: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+  openExternal(url);
+};
 
-th,
-td {
-  padding: 10px 12px;
-  text-align: left;
-  font-size: 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.12);
-}
+$("fetch").onclick = async () => {
+  const q = $("query").value.trim();
+  if (!q) return;
+  if (isAddress(q)) return loadAddressView(q, "tx");
+};
 
-th {
-  position: sticky;
-  top: 0;
-  background: rgba(10,20,40,.9);
-  backdrop-filter: blur(10px);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .4px;
-}
+$("tabTx").onclick = () => {
+  const q = $("query").value.trim();
+  if (isAddress(q)) loadAddressView(q, "tx");
+};
 
-tr:last-child td {
-  border-bottom: none;
-}
+$("tabErc20").onclick = () => {
+  const q = $("query").value.trim();
+  if (isAddress(q)) loadAddressView(q, "erc20");
+};
 
-/* =========================
-   LINKS
-========================= */
-a,
-.click {
-  color: #cfe1ff;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-a:hover,
-.click:hover {
-  text-decoration: underline;
-}
-
-/* =========================
-   CODE / PRE
-========================= */
-pre {
-  margin-top: 16px;
-  background: rgba(10,20,40,.7);
-  border: 1px solid rgba(255,255,255,.3);
-  border-radius: 18px;
-  padding: 14px;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #eaf1ff;
-  backdrop-filter: blur(14px);
-}
-
-/* =========================
-   BADGE
-========================= */
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: rgba(255,255,255,0.22);
-  border: 1px solid rgba(255,255,255,0.30);
-      }
+$("query").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("open").click();
+});
