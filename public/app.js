@@ -1,457 +1,436 @@
+/* =========================
+   Base Mini Scan - app.js
+   - Home: input + gas tracker
+   - Detail: overview + tabs (tx / erc20)
+   - Routing: hash (#/ and #/address/<addr>)
+========================= */
+
 const $ = (id) => document.getElementById(id);
 
-/* =========================
-   Utils
-========================= */
+const pageHome = $("pageHome");
+const pageDetail = $("pageDetail");
 
-const isAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
-const isTx = (v) => /^0x[a-fA-F0-9]{64}$/.test(v);
-const isBlock = (v) => /^[0-9]{1,20}$/.test(v);
+const elQuery = $("query");
+const elOpen = $("open");
 
-function shortHex(h, a = 6, b = 4) {
-  if (!h || h.length < a + b + 2) return h || "-";
-  return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
+const elBack = $("back");
+const elLink = $("link");
+
+const elDetailAddress = $("detailAddress");
+const elDetailBalance = $("detailBalance");
+const elDetailTxCount = $("detailTxCount");
+const elDetailOutput = $("detailOutput");
+
+const tabTx = $("tabTx");
+const tabErc20 = $("tabErc20");
+
+let gasTimer = null;
+
+/* -------------------------
+   Small helpers
+------------------------- */
+
+function showPage(name) {
+  const isHome = name === "home";
+  pageHome.style.display = isHome ? "" : "none";
+  pageDetail.style.display = isHome ? "none" : "";
 }
 
-function makeBaseScanUrl(q) {
-  if (isTx(q)) return `https://basescan.org/tx/${q}`;
-  if (isAddress(q)) return `https://basescan.org/address/${q}`;
-  if (isBlock(q)) return `https://basescan.org/block/${q}`;
-  return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
+function shortAddr(a) {
+  if (!a || a.length < 10) return a || "-";
+  return `${a.slice(0, 8)}…${a.slice(-6)}`;
 }
 
-function weiToEthStr(wei, decimals = 6) {
-  const n = Number(wei);
-  if (!Number.isFinite(n)) return null;
-  return (n / 1e18).toFixed(decimals);
+function isAddress(q) {
+  return /^0x[a-fA-F0-9]{40}$/.test(q || "");
 }
 
-async function openExternal(url) {
-  try {
-    if (window.__fcSdk && (await window.__fcSdk.isInMiniApp())) {
-      await window.__fcSdk.actions.openUrl(url);
-      return;
-    }
-  } catch {}
-  window.open(url, "_blank", "noopener,noreferrer");
+function setActiveTab(which) {
+  const isTx = which === "tx";
+  tabTx.classList.toggle("active", isTx);
+  tabErc20.classList.toggle("active", !isTx);
+
+  tabTx.classList.toggle("secondary", !isTx);
+  tabErc20.classList.toggle("secondary", isTx);
 }
 
-/* =========================
-   Router (hash)
-   #/ => home
-   #/address/0x...?tab=tx|erc20 => detail
-========================= */
-
-function goHome() {
-  location.hash = "#/";
-}
-
-function goDetail(address, tab = "tx") {
-  location.hash = `#/address/${address}?tab=${encodeURIComponent(tab)}`;
-}
+/* -------------------------
+   Routing (hash)
+   - #/
+   - #/address/<addr>
+   - optional query: ?tab=tx|erc20
+------------------------- */
 
 function parseRoute() {
-  const raw = (location.hash || "#/").slice(1);
+  const raw = (location.hash || "#/").replace(/^#/, "");
   const [path, qs] = raw.split("?");
-  const parts = path.split("/").filter(Boolean);
-  const query = new URLSearchParams(qs || "");
-  return { parts, query };
+  const parts = path.split("/").filter(Boolean); // ["address", "0x..."]
+  const params = new URLSearchParams(qs || "");
+  const tab = params.get("tab") || "tx";
+  return { parts, tab };
 }
 
-/* =========================
-   UI show/hide
-========================= */
+function navTo(hash) {
+  location.hash = hash;
+}
 
-function showPage(which) {
-  const home = $("pageHome");
-  const detail = $("pageDetail");
-  if (!home || !detail) return;
+/* -------------------------
+   Home actions
+------------------------- */
 
-  if (which === "detail") {
-    home.style.display = "none";
-    detail.style.display = "";
-  } else {
-    detail.style.display = "none";
-    home.style.display = "";
+function handleOpen() {
+  const q = (elQuery.value || "").trim();
+  if (!q) return;
+
+  // If user pasted an address -> go to detail
+  if (isAddress(q)) {
+    navTo(`#/address/${q}?tab=tx`);
+    return;
   }
-}
 
-function setActiveTab(tab) {
-  ["tabTx", "tabErc20"].forEach((id) => {
-    const el = $(id);
-    if (el) el.classList.add("secondary");
-  });
-  const active = tab === "erc20" ? "tabErc20" : "tabTx";
-  const el = $(active);
-  if (el) el.classList.remove("secondary");
-}
+  // If tx hash or block -> open BaseScan directly
+  // (keep your existing behavior: just open external)
+  const isTxHash = /^0x[a-fA-F0-9]{64}$/.test(q);
+  const isBlock = /^\d+$/.test(q);
 
-/* =========================
-   Skeleton (inject CSS once)
-========================= */
-
-function ensureSkeletonCss() {
-  if (document.getElementById("__sk_css")) return;
-  const s = document.createElement("style");
-  s.id = "__sk_css";
-  s.textContent = `
-    .sk { position:relative; overflow:hidden; background:rgba(255,255,255,0.16);
-          border:1px solid rgba(255,255,255,0.22); border-radius:14px; }
-    .sk::after { content:""; position:absolute; top:0; left:-150%; width:150%; height:100%;
-                 background:linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
-                 animation:sk 1.15s ease-in-out infinite; }
-    @keyframes sk { 0%{left:-150%} 100%{left:150%} }
-    .skline{ height:12px; margin:10px 0; } .skline.lg{ height:16px; }
-    .skrow{ height:44px; margin-top:10px; }
-  `;
-  document.head.appendChild(s);
-}
-
-function renderDetailSkeleton(tab = "tx") {
-  ensureSkeletonCss();
-  setActiveTab(tab);
-
-  const a = $("detailAddress");
-  const b = $("detailBalance");
-  const c = $("detailTxCount");
-  const out = $("detailOutput");
-
-  if (a) a.innerHTML = `<div class="sk skline lg"></div>`;
-  if (b) b.innerHTML = `<div class="sk skline"></div>`;
-  if (c) c.innerHTML = `<div class="sk skline"></div>`;
-
-  if (out) {
-    out.innerHTML = `
-      <div class="resultCard">
-        <div class="sk skline lg"></div>
-        <div class="sk skline"></div>
-        <div class="sk skline"></div>
-      </div>
-      <div class="tableWrap">
-        <div class="sk skrow"></div>
-        <div class="sk skrow"></div>
-        <div class="sk skrow"></div>
-      </div>
-    `;
+  if (isTxHash) {
+    window.open(`https://basescan.org/tx/${q}`, "_blank");
+    return;
   }
-}
-
-/* =========================
-   Render tables
-========================= */
-
-function ageFromTs(ts) {
-  const t = Number(ts) * 1000;
-  if (!Number.isFinite(t)) return "-";
-  const d = Math.floor((Date.now() - t) / 1000);
-  if (d < 60) return `${d}s ago`;
-  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
-  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
-  return `${Math.floor(d / 86400)}d ago`;
-}
-
-function renderTxTable(list = []) {
-  const rows = list.slice(0, 25).map((tx) => {
-    const hash = tx.hash || tx.transactionHash || "-";
-    const from = tx.from || "-";
-    const to = tx.to || "-";
-    const block = tx.blockNumber || "-";
-    const value = tx.value || "0";
-    const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
-    return `
-      <tr>
-        <td>
-          <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
-          <div class="small">Block ${block}</div>
-        </td>
-        <td class="small">${age}</td>
-        <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
-        <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
-        <td>${weiToEthStr(value) ?? "0"} ETH</td>
-      </tr>
-    `;
-  }).join("");
-
-  return `
-    <div class="tableWrap">
-      <div class="tableScroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="5">No transactions</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-function renderErc20Table(list = []) {
-  const rows = list.slice(0, 25).map((t) => {
-    const hash = t.hash || t.transactionHash || "-";
-    const token = t.tokenSymbol || "-";
-    const from = t.from || "-";
-    const to = t.to || "-";
-    const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
-    const amount = t.value ?? "-";
-    return `
-      <tr>
-        <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
-        <td class="small">${age}</td>
-        <td>${token}</td>
-        <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
-        <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
-        <td>${amount}</td>
-      </tr>
-    `;
-  }).join("");
-
-  return `
-    <div class="tableWrap">
-      <div class="tableScroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="6">No transfers</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-/* =========================
-   Detail loader
-========================= */
-
-async function loadDetail(address, tab = "tx") {
-  stopGasAutoRefresh();
-  showPage("detail");
-  renderDetailSkeleton(tab);
-
-  try {
-    const r = await fetch(
-      `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}&offset=25&page=1`,
-      { cache: "no-store" }
-    );
-    const j = await r.json();
-    if (!r.ok || j?.error) throw j;
-
-    const addrEl = $("detailAddress");
-    if (addrEl) {
-      addrEl.innerHTML = `
-        <span class="click" data-open="${makeBaseScanUrl(address)}">${address}</span>
-        <span class="muted" style="margin-left:10px">${shortHex(address, 8, 6)}</span>
-      `;
-      addrEl.querySelectorAll("[data-open]").forEach((el) => {
-        el.onclick = () => openExternal(el.dataset.open);
-      });
-    }
-
-    const eth = weiToEthStr(j.balanceWei, 6);
-    const balEl = $("detailBalance");
-    if (balEl) balEl.textContent = `${eth ?? j.balanceWei} ETH`;
-
-    const txCount = j.txCount ?? j.totalTxCount ?? "-";
-    const cntEl = $("detailTxCount");
-    if (cntEl) cntEl.textContent = typeof txCount === "number" ? txCount.toLocaleString() : String(txCount);
-
-    setActiveTab(tab);
-    const out = $("detailOutput");
-    if (out) {
-      out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
-      out.querySelectorAll("[data-open]").forEach((el) => {
-        el.onclick = () => openExternal(el.dataset.open);
-      });
-    }
-  } catch (e) {
-    const out = $("detailOutput");
-    if (out) out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
+  if (isBlock) {
+    window.open(`https://basescan.org/block/${q}`, "_blank");
+    return;
   }
+
+  // fallback
+  window.open(`https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`, "_blank");
 }
 
-/* =========================
-   GAS (Home only, 1 minute refresh)
-========================= */
+/* -------------------------
+   Gas Tracker
+------------------------- */
 
-let __gasTimer = null;
-
-function fmtGwei(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return "-";
-  return n < 1 ? n.toFixed(3) : n.toFixed(1);
-}
-
-function gasUtilPercent(gasUsedRatio) {
-  const n = Number(gasUsedRatio);
-  if (!Number.isFinite(n)) return "-";
-  return (n * 100).toFixed(2) + "%";
+function stopGasAutoRefresh() {
+  if (gasTimer) clearInterval(gasTimer);
+  gasTimer = null;
 }
 
 function renderGas(g, nextSec) {
-  const standard = fmtGwei(g.safe);
-  const fast = fmtGwei(g.fast);
-  const rapid = fmtGwei(g.rapid);
+  // This renderer is used on HOME only.
+  // The header ("Base Gas Tracker" + next update) lives in index.html,
+  // so we only render the cards + additional info here.
+  const standard = g?.standard ?? {};
+  const fast = g?.fast ?? {};
+  const rapid = g?.rapid ?? {};
+  const block = g?.block ?? g?.lastBlock ?? g?.latestBlock ?? "-";
+  const util = g?.utilization ?? g?.avgUtilization ?? "-";
+  const source = g?.source ?? "-";
+
+  const card = (label, emoji, item) => {
+    const gwei = item?.gwei ?? item?.priceGwei ?? item?.maxFeePerGasGwei;
+    const secs = item?.seconds ?? item?.waitSeconds;
+    const cost = item?.usd ?? item?.costUsd;
+
+    const gweiStr = typeof gwei === "number" ? gwei.toFixed(3) : (gwei ?? "-");
+    const secsStr =
+      typeof secs === "number" ? `~ ${Math.max(0, Math.round(secs))} secs` : (secs ?? "");
+    const usdStr =
+      typeof cost === "number" ? `$${cost.toFixed(2)}` : (cost ?? null);
+
+    return `
+      <div class="gasCard">
+        <div class="gasEmoji">${emoji}</div>
+        <div class="gasLabel">${label}</div>
+        <div class="gasValue">${gweiStr} <span class="gasUnit">Gwei</span></div>
+        <div class="muted small">
+          ${usdStr ? `<span>${usdStr}</span> • ` : ""}${secsStr || ""}
+        </div>
+      </div>
+    `;
+  };
 
   return `
-    <div class="gasWrap">
-      <div class="gasTopBar">
-        <div class="gasTitle">Base Gas Tracker ⛽</div>
-        <div class="gasNext">Next update in <b>${nextSec}s</b></div>
-      </div>
+    <div class="gasGrid">
+      ${card("Standard", "🙂", standard)}
+      ${card("Fast", "😄", fast)}
+      ${card("Rapid", "🚀", rapid)}
+    </div>
 
-      <div class="gasGrid">
-        <div class="gasCard">
-          <div class="gasCardHead"><div class="gasEmoji">🙂</div> Standard</div>
-          <div class="gasValue standard">${standard} Gwei</div>
-          <div class="gasSub">~ 12–16 secs</div>
+    <div class="resultCard" style="margin-top:14px">
+      <div class="sectionTitle">Additional Info</div>
+      <div class="statRow">
+        <div class="statPill">
+          <div class="muted small">LAST BLOCK</div>
+          <div class="statPillVal">${block}</div>
         </div>
-
-        <div class="gasCard">
-          <div class="gasCardHead"><div class="gasEmoji">😄</div> Fast</div>
-          <div class="gasValue fast">${fast} Gwei</div>
-          <div class="gasSub">~ 6–8 secs</div>
-        </div>
-
-        <div class="gasCard center">
-          <div class="gasCardHead"><div class="gasEmoji">🚀</div> Rapid</div>
-          <div class="gasValue rapid">${rapid} Gwei</div>
-          <div class="gasSub">~ 2–3 secs</div>
+        <div class="statPill">
+          <div class="muted small">AVG. UTILIZATION</div>
+          <div class="statPillVal">${typeof util === "number" ? `${util.toFixed(2)}%` : util}</div>
         </div>
       </div>
-
-      <div class="resultCard" style="padding:14px;">
-        <div style="font-weight:800;margin-bottom:10px;">Additional Info</div>
-        <div class="gasInfoGrid">
-          <div class="gasInfoCard">
-            <div class="gasInfoLabel">LAST BLOCK</div>
-            <div class="gasInfoValue">${g.lastBlock ?? "-"}</div>
-          </div>
-          <div class="gasInfoCard">
-            <div class="gasInfoLabel">AVG. UTILIZATION</div>
-            <div class="gasInfoValue">${gasUtilPercent(g.gasUsedRatio)}</div>
-          </div>
-        </div>
-        <div class="gasFoot">Source: ${g.source ?? "-"}</div>
-      </div>
+      <div class="muted small" style="margin-top:10px">Source: ${source}</div>
     </div>
   `;
 }
 
 async function loadGasOnce(next) {
-  const out = $("gasOutput");
+  const out = $("gasOutput") || $("output");
   if (!out) return;
 
   out.innerHTML = `<div class="muted">Loading gas…</div>`;
+
+  // Update "next update" label immediately
+  const b = document.querySelector("#gasNext b") || document.querySelector(".gasNext b");
+  if (b) b.textContent = `${next}s`;
+
   try {
-    const r = await fetch("/api/gas", { cache: "no-store" });
-    const j = await r.json();
-    if (!r.ok || j?.error) throw j;
-    out.innerHTML = renderGas(j, next);
+    const res = await fetch("/api/gas", { cache: "no-store" });
+    const json = await res.json();
+
+    if (!res.ok || json?.error) {
+      out.innerHTML = `<div class="muted">Gas API error</div>`;
+      return;
+    }
+
+    out.innerHTML = renderGas(json, next);
   } catch (e) {
-    out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
+    out.innerHTML = `<div class="muted">Failed to load gas</div>`;
   }
 }
 
 function startGasAutoRefresh() {
   stopGasAutoRefresh();
-  showPage("home");
 
   let next = 60;
+  const b0 = document.querySelector("#gasNext b") || document.querySelector(".gasNext b");
+  if (b0) b0.textContent = `${next}s`;
   loadGasOnce(next);
 
-  __gasTimer = setInterval(async () => {
-    next -= 1;
+  gasTimer = setInterval(() => {
+    const b = document.querySelector("#gasNext b") || document.querySelector(".gasNext b");
+    if (b) b.textContent = `${next}s`;
 
+    next -= 1;
     if (next <= 0) {
       next = 60;
-      await loadGasOnce(next);
-    } else {
-      const b = document.querySelector("#pageHome .gasNext b");
-      if (b) b.textContent = `${next}s`;
+      loadGasOnce(next);
     }
   }, 1000);
 }
 
-function stopGasAutoRefresh() {
-  if (__gasTimer) clearInterval(__gasTimer);
-  __gasTimer = null;
+/* -------------------------
+   Detail Page (Address)
+   expects /api/address returns:
+   {
+     address,
+     balanceEth,
+     txCountTotal,   // total count (bukan panjang list)
+     transactions: [...],
+     erc20: [...]
+   }
+------------------------- */
+
+function renderOverviewSkeleton() {
+  elDetailBalance.textContent = "…";
+  elDetailTxCount.textContent = "…";
+  elDetailOutput.innerHTML = `
+    <div class="skeletonBlock" style="height:12px; width:40%; margin:10px 0"></div>
+    <div class="skeletonTable">
+      <div class="skeletonRow"></div>
+      <div class="skeletonRow"></div>
+      <div class="skeletonRow"></div>
+      <div class="skeletonRow"></div>
+      <div class="skeletonRow"></div>
+    </div>
+  `;
 }
 
-/* =========================
-   Router handler
-========================= */
+function renderTxTable(rows) {
+  if (!rows || rows.length === 0) {
+    return `<div class="muted">No transactions found.</div>`;
+  }
 
-function handleRoute() {
-  const { parts, query } = parseRoute();
+  // minimal columns to fit mobile
+  const head = `
+    <div class="table">
+      <div class="thead">
+        <div>Tx</div>
+        <div>Age</div>
+        <div>From</div>
+        <div>To</div>
+        <div>Value</div>
+      </div>
+  `;
 
-  if (!parts.length) {
+  const body = rows
+    .map((r) => {
+      const hash = r.hash || r.txHash || "-";
+      const age = r.age || r.timeAgo || "-";
+      const from = r.from || "-";
+      const to = r.to || "-";
+      const val = r.valueEth ?? r.value ?? "-";
+
+      return `
+        <div class="trow">
+          <div class="mono">${shortAddr(hash)}</div>
+          <div class="muted">${age}</div>
+          <div class="mono">${shortAddr(from)}</div>
+          <div class="mono">${shortAddr(to)}</div>
+          <div class="mono">${val}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return head + body + `</div>`;
+}
+
+function renderErc20Table(rows) {
+  if (!rows || rows.length === 0) {
+    return `<div class="muted">No ERC-20 transfers found.</div>`;
+  }
+
+  const head = `
+    <div class="table">
+      <div class="thead">
+        <div>Tx</div>
+        <div>Age</div>
+        <div>Token</div>
+        <div>From</div>
+        <div>To</div>
+        <div>Amount</div>
+      </div>
+  `;
+
+  const body = rows
+    .map((r) => {
+      const hash = r.hash || r.txHash || "-";
+      const age = r.age || r.timeAgo || "-";
+      const token = r.tokenSymbol || r.token || "-";
+      const from = r.from || "-";
+      const to = r.to || "-";
+      const amt = r.amount || r.value || "-";
+
+      return `
+        <div class="trow">
+          <div class="mono">${shortAddr(hash)}</div>
+          <div class="muted">${age}</div>
+          <div class="mono">${token}</div>
+          <div class="mono">${shortAddr(from)}</div>
+          <div class="mono">${shortAddr(to)}</div>
+          <div class="mono">${amt}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return head + body + `</div>`;
+}
+
+async function loadAddressDetail(address, tab) {
+  renderOverviewSkeleton();
+
+  // Link kecil (biar user bisa klik BaseScan)
+  if (elLink) {
+    elLink.innerHTML = `<a href="https://basescan.org/address/${address}" target="_blank" rel="noreferrer">BaseScan ↗</a>`;
+  }
+
+  try {
+    // Keep simple: server decides pagination.
+    const res = await fetch(`/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}`, {
+      cache: "no-store",
+    });
+    const json = await res.json();
+
+    if (!res.ok || json?.error) {
+      elDetailOutput.innerHTML = `<div class="muted">Address API error</div>`;
+      elDetailBalance.textContent = "-";
+      elDetailTxCount.textContent = "-";
+      return;
+    }
+
+    elDetailAddress.textContent = address;
+    elDetailBalance.textContent =
+      typeof json.balanceEth === "number" ? `${json.balanceEth.toFixed(6)} ETH` : (json.balanceEth ?? "-");
+
+    // IMPORTANT: total tx count from server (bukan panjang list)
+    const total = json.txCountTotal ?? json.totalTx ?? json.txCount ?? "-";
+    elDetailTxCount.textContent = total;
+
+    if (tab === "erc20") {
+      elDetailOutput.innerHTML = renderErc20Table(json.erc20 || json.erc20Transfers || []);
+    } else {
+      elDetailOutput.innerHTML = renderTxTable(json.transactions || json.txs || []);
+    }
+  } catch (e) {
+    elDetailOutput.innerHTML = `<div class="muted">Failed to load address</div>`;
+    elDetailBalance.textContent = "-";
+    elDetailTxCount.textContent = "-";
+  }
+}
+
+/* -------------------------
+   Route handler
+------------------------- */
+
+function onRoute() {
+  const { parts, tab } = parseRoute();
+
+  // HOME
+  if (parts.length === 0 || parts[0] === "") {
+    showPage("home");
     startGasAutoRefresh();
     return;
   }
 
-  if (parts[0] === "address" && parts[1] && isAddress(parts[1])) {
-    const tab = query.get("tab") === "erc20" ? "erc20" : "tx";
-    loadDetail(parts[1], tab);
-    return;
-  }
-
-  goHome();
-}
-
-/* =========================
-   Bind
-========================= */
-
-window.addEventListener("DOMContentLoaded", () => {
-  ensureSkeletonCss();
-
-  $("open")?.addEventListener("click", () => {
-    const q = $("query")?.value?.trim();
-    if (!q) return;
-
-    if (isAddress(q)) {
-      goDetail(q, "tx");
+  // DETAIL
+  if (parts[0] === "address") {
+    const address = parts[1];
+    if (!isAddress(address)) {
+      navTo("#/");
       return;
     }
 
-    openExternal(makeBaseScanUrl(q));
-  });
+    stopGasAutoRefresh();
+    showPage("detail");
+    setActiveTab(tab === "erc20" ? "erc20" : "tx");
+    loadAddressDetail(address, tab === "erc20" ? "erc20" : "tx");
+    return;
+  }
 
-  // Optional: kalau nanti kamu menambah tombol fetch, ini tetap aman
-  $("fetch")?.addEventListener("click", () => $("open")?.click());
+  // Unknown route -> home
+  navTo("#/");
+}
 
-  $("tabTx")?.addEventListener("click", () => {
-    const { parts } = parseRoute();
-    const addr = parts?.[1];
-    if (addr && isAddress(addr)) goDetail(addr, "tx");
-  });
+/* -------------------------
+   Events
+------------------------- */
 
-  $("tabErc20")?.addEventListener("click", () => {
-    const { parts } = parseRoute();
-    const addr = parts?.[1];
-    if (addr && isAddress(addr)) goDetail(addr, "erc20");
-  });
-
-  $("back")?.addEventListener("click", () => {
-    if (history.length > 1) history.back();
-    else goHome();
-  });
-
-  $("query")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("open")?.click();
-  });
-
-  window.addEventListener("hashchange", handleRoute);
-
-  if (!location.hash) location.hash = "#/";
-  handleRoute();
+elOpen?.addEventListener("click", handleOpen);
+elQuery?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") handleOpen();
 });
+
+elBack?.addEventListener("click", () => navTo("#/"));
+
+tabTx?.addEventListener("click", () => {
+  const { parts } = parseRoute();
+  const address = parts?.[1];
+  if (!address) return;
+  navTo(`#/address/${address}?tab=tx`);
+});
+
+tabErc20?.addEventListener("click", () => {
+  const { parts } = parseRoute();
+  const address = parts?.[1];
+  if (!address) return;
+  navTo(`#/address/${address}?tab=erc20`);
+});
+
+window.addEventListener("hashchange", onRoute);
+
+/* -------------------------
+   Init
+------------------------- */
+
+onRoute();
