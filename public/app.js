@@ -24,7 +24,6 @@ function toNum(v) {
   if (v === null || v === undefined) return NaN;
   if (typeof v === "number") return v;
   if (typeof v === "string") {
-    // handle "0.004", "0.004\n", etc
     const n = parseFloat(v.trim());
     return Number.isFinite(n) ? n : NaN;
   }
@@ -159,7 +158,10 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list = []) {
-  const rows = list.slice(0, 25).map((tx) => `
+  const rows = list
+    .slice(0, 25)
+    .map(
+      (tx) => `
     <tr>
       <td>
         <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">
@@ -172,7 +174,9 @@ function renderTxTable(list = []) {
       <td class="small">${shortHex(tx.to)}</td>
       <td>${weiToEthStr(tx.value) ?? "0"} ETH</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   return `
     <div class="tableWrap">
@@ -193,7 +197,10 @@ function renderTxTable(list = []) {
 }
 
 function renderErc20Table(list = []) {
-  const rows = list.slice(0, 25).map((t) => `
+  const rows = list
+    .slice(0, 25)
+    .map(
+      (t) => `
     <tr>
       <td>${shortHex(t.hash)}</td>
       <td class="small">${ageFromTs(t.timeStamp)}</td>
@@ -202,7 +209,9 @@ function renderErc20Table(list = []) {
       <td class="small">${shortHex(t.to)}</td>
       <td>${t.value}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
   return `
     <div class="tableWrap">
@@ -229,6 +238,13 @@ function renderErc20Table(list = []) {
 let __detailAddress = null;
 let __detailTab = "tx";
 
+function hideLinkRow() {
+  const link = $("link");
+  if (!link) return;
+  link.innerHTML = "";
+  link.style.display = "none"; // <- ini yang menghilangkan baris link di bawah profil
+}
+
 async function loadDetail(address, tab = "tx") {
   __detailAddress = address;
   __detailTab = tab;
@@ -238,13 +254,17 @@ async function loadDetail(address, tab = "tx") {
   setActiveDetailTab(tab);
 
   $("detailAddress").textContent = address;
-  $("link").innerHTML = "";
+
+  // HAPUS link basescan di UI detail
+  hideLinkRow();
 
   const out = $("detailOutput");
   out.innerHTML = overviewSkeleton() + tableSkeleton();
 
   try {
-    const r = await fetch(`/api/address?address=${address}&tab=${tab}`, { cache: "no-store" });
+    const r = await fetch(`/api/address?address=${address}&tab=${tab}`, {
+      cache: "no-store",
+    });
     const j = await r.json();
     if (!r.ok || j?.error) throw j;
 
@@ -256,16 +276,12 @@ async function loadDetail(address, tab = "tx") {
     const total = toNum(j.totalTxCount);
     $("detailTxCount").textContent = Number.isFinite(total) ? String(total) : "-";
 
-    // link
-    const url = makeBaseScanUrl(address);
-    $("link").innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-
     // table (tab)
-    out.innerHTML = (tab === "erc20") ? renderErc20Table(j.list) : renderTxTable(j.list);
+    out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
 
-    out.querySelectorAll("[data-open]").forEach((el) =>
-      el.onclick = () => openExternal(el.dataset.open)
-    );
+    out.querySelectorAll("[data-open]").forEach((el) => {
+      el.onclick = () => openExternal(el.dataset.open);
+    });
   } catch (e) {
     $("detailTxCount").textContent = "-";
     $("detailBalance").textContent = "-";
@@ -282,7 +298,6 @@ let __gasTimer = null;
 function formatGwei(v) {
   const n = toNum(v);
   if (!Number.isFinite(n)) return "—";
-  // keep 3 decimals for sub-1 gwei
   if (n < 1) return n.toFixed(3);
   if (n < 10) return n.toFixed(2);
   return n.toFixed(1);
@@ -291,13 +306,17 @@ function formatGwei(v) {
 function renderGasSkeleton() {
   return `
     <div class="gasGrid">
-      ${Array.from({ length: 3 }).map(() => `
+      ${Array.from({ length: 3 })
+        .map(
+          () => `
         <div class="gasCard skeleton">
           <div class="sk-line w30"></div>
           <div class="sk-line w50"></div>
           <div class="sk-line w40"></div>
         </div>
-      `).join("")}
+      `
+        )
+        .join("")}
       <div class="resultCard skeleton">
         <div class="sk-line w40"></div>
         <div class="sk-line w60"></div>
@@ -312,10 +331,9 @@ function renderGasError(err) {
 }
 
 function renderGas(data) {
-  // support old/new keys
-  const safeRaw = (data?.safe ?? data?.standard ?? data?.slow ?? null);
-  const fastRaw = (data?.fast ?? null);
-  const rapidRaw = (data?.rapid ?? data?.pro ?? null);
+  const safeRaw = data?.safe ?? data?.standard ?? data?.slow ?? null;
+  const fastRaw = data?.fast ?? null;
+  const rapidRaw = data?.rapid ?? data?.pro ?? null;
 
   const safe = formatGwei(safeRaw);
   const fast = formatGwei(fastRaw);
@@ -326,7 +344,6 @@ function renderGas(data) {
   let util = "—";
   const ratio = toNum(data?.gasUsedRatio);
   if (Number.isFinite(ratio)) {
-    // ratio might be 0.195 or 19.5
     const pct = ratio <= 1 ? ratio * 100 : ratio;
     util = `${pct.toFixed(2)}%`;
   }
@@ -427,18 +444,18 @@ function handleRoute() {
 window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
+  // pastikan link row tidak muncul di awal
+  hideLinkRow();
+
   // Home
   $("open")?.addEventListener("click", () => {
     const q = $("query")?.value?.trim() || "";
     if (!q) return;
 
     if (isAddress(q)) {
-      // go to detail page
       setHash(`/address/${q}`);
     } else {
-      // open basescan directly
-      const url = makeBaseScanUrl(q);
-      openExternal(url);
+      openExternal(makeBaseScanUrl(q));
     }
   });
 
