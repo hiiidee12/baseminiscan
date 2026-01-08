@@ -15,6 +15,7 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY,
       process.env.ETHERSCAN_API_KEY_2,
       process.env.ETHERSCAN_API_KEY_3,
+      process.env.ETHERSCAN_API_KEY_4,
     ].filter(Boolean);
 
     if (API_KEYS.length === 0) {
