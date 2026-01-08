@@ -55,7 +55,6 @@
           <div class="muted gasNext" id="gasNext">Next update in <b>—</b></div>
         </div>
 
-        <!-- tempat render gas cards -->
         <div id="gasOutput"></div>
 
         <div class="muted">Farcaster Mini App • Base Network</div>
@@ -63,8 +62,12 @@
 
       <!-- ============= DETAIL PAGE ============= -->
       <section id="pageDetail" data-page="detail" style="display:none">
+        <!-- Floating top bar (Back di atas profil) -->
         <div class="detailTop">
-          <button id="back" class="secondary">← Back</button>
+          <button id="back" class="secondary backBtn">← Back</button>
+
+          <!-- elemen ini disisakan biar app.js kamu tidak error,
+               tapi akan disembunyikan lewat CSS -->
           <div class="muted" id="link"></div>
         </div>
 
