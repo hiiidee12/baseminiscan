@@ -37,42 +37,9 @@ async function openExternal(url) {
 }
 
 /* =========================
-   Tiny skeleton CSS (injected once)
-========================= */
-
-function ensureSkeletonCss() {
-  if (document.getElementById("__sk_css")) return;
-  const s = document.createElement("style");
-  s.id = "__sk_css";
-  s.textContent = `
-    .sk {
-      position: relative;
-      overflow: hidden;
-      background: rgba(255,255,255,0.16);
-      border: 1px solid rgba(255,255,255,0.22);
-      border-radius: 14px;
-    }
-    .sk::after {
-      content: "";
-      position: absolute;
-      top: 0; left: -150%;
-      width: 150%; height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
-      animation: sk 1.15s ease-in-out infinite;
-    }
-    @keyframes sk { 0% { left: -150% } 100% { left: 150% } }
-    .skline { height: 12px; margin: 10px 0; }
-    .skline.sm { height: 10px; opacity: .9 }
-    .skline.lg { height: 16px; opacity: 1 }
-    .skrow { height: 44px; margin-top: 10px; }
-  `;
-  document.head.appendChild(s);
-}
-
-/* =========================
-   Simple Router (hash)
-   - #/                 => Home
-   - #/address/0x...?tab=tx|erc20 => Detail
+   Router (hash)
+   #/ => home
+   #/address/0x...?tab=tx|erc20 => detail
 ========================= */
 
 function goHome() {
@@ -120,7 +87,57 @@ function setActiveTab(tab) {
 }
 
 /* =========================
-   Render: tables
+   Skeleton (inject CSS once)
+========================= */
+
+function ensureSkeletonCss() {
+  if (document.getElementById("__sk_css")) return;
+  const s = document.createElement("style");
+  s.id = "__sk_css";
+  s.textContent = `
+    .sk { position:relative; overflow:hidden; background:rgba(255,255,255,0.16);
+          border:1px solid rgba(255,255,255,0.22); border-radius:14px; }
+    .sk::after { content:""; position:absolute; top:0; left:-150%; width:150%; height:100%;
+                 background:linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+                 animation:sk 1.15s ease-in-out infinite; }
+    @keyframes sk { 0%{left:-150%} 100%{left:150%} }
+    .skline{ height:12px; margin:10px 0; } .skline.lg{ height:16px; }
+    .skrow{ height:44px; margin-top:10px; }
+  `;
+  document.head.appendChild(s);
+}
+
+function renderDetailSkeleton(tab = "tx") {
+  ensureSkeletonCss();
+  setActiveTab(tab);
+
+  const a = $("detailAddress");
+  const b = $("detailBalance");
+  const c = $("detailTxCount");
+  const out = $("detailOutput");
+
+  if (a) a.innerHTML = `<div class="sk skline lg"></div>`;
+  if (b) b.innerHTML = `<div class="sk skline"></div>`;
+  if (c) c.innerHTML = `<div class="sk skline"></div>`;
+
+  if (out) {
+    out.innerHTML = `
+      <div class="resultCard">
+        <div class="sk skline lg"></div>
+        <div class="sk skline"></div>
+        <div class="sk skline"></div>
+      </div>
+      <div class="tableWrap">
+        <div class="sk skrow"></div>
+        <div class="sk skrow"></div>
+        <div class="sk skrow"></div>
+      </div>
+    `;
+  }
+}
+
+/* =========================
+   Render tables
 ========================= */
 
 function ageFromTs(ts) {
@@ -180,7 +197,7 @@ function renderErc20Table(list = []) {
     const from = t.from || "-";
     const to = t.to || "-";
     const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
-    const amount = t.value ?? "-"; // (format decimals tetap ditangani backend/formatters kamu)
+    const amount = t.value ?? "-";
     return `
       <tr>
         <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
@@ -212,37 +229,8 @@ function renderErc20Table(list = []) {
 }
 
 /* =========================
-   Detail skeleton + loader
+   Detail loader
 ========================= */
-
-function renderDetailSkeleton(tab = "tx") {
-  ensureSkeletonCss();
-  setActiveTab(tab);
-
-  const a = $("detailAddress");
-  const b = $("detailBalance");
-  const c = $("detailTxCount");
-  const out = $("detailOutput");
-
-  if (a) a.innerHTML = `<div class="sk skline lg"></div>`;
-  if (b) b.innerHTML = `<div class="sk skline"></div>`;
-  if (c) c.innerHTML = `<div class="sk skline"></div>`;
-
-  if (out) {
-    out.innerHTML = `
-      <div class="resultCard">
-        <div class="sk skline lg"></div>
-        <div class="sk skline"></div>
-        <div class="sk skline sm"></div>
-      </div>
-      <div class="tableWrap">
-        <div class="sk skrow"></div>
-        <div class="sk skrow"></div>
-        <div class="sk skrow"></div>
-      </div>
-    `;
-  }
-}
 
 async function loadDetail(address, tab = "tx") {
   stopGasAutoRefresh();
@@ -257,11 +245,7 @@ async function loadDetail(address, tab = "tx") {
     const j = await r.json();
     if (!r.ok || j?.error) throw j;
 
-    // Fill header fields
     const addrEl = $("detailAddress");
-    const balEl = $("detailBalance");
-    const cntEl = $("detailTxCount");
-
     if (addrEl) {
       addrEl.innerHTML = `
         <span class="click" data-open="${makeBaseScanUrl(address)}">${address}</span>
@@ -273,18 +257,17 @@ async function loadDetail(address, tab = "tx") {
     }
 
     const eth = weiToEthStr(j.balanceWei, 6);
+    const balEl = $("detailBalance");
     if (balEl) balEl.textContent = `${eth ?? j.balanceWei} ETH`;
 
-    // ✅ total txCount from backend (number OR string like "10000+")
     const txCount = j.txCount ?? j.totalTxCount ?? "-";
+    const cntEl = $("detailTxCount");
     if (cntEl) cntEl.textContent = typeof txCount === "number" ? txCount.toLocaleString() : String(txCount);
 
-    // Render table
     setActiveTab(tab);
     const out = $("detailOutput");
     if (out) {
       out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
-
       out.querySelectorAll("[data-open]").forEach((el) => {
         el.onclick = () => openExternal(el.dataset.open);
       });
@@ -307,12 +290,6 @@ function fmtGwei(v) {
   return n < 1 ? n.toFixed(3) : n.toFixed(1);
 }
 
-function rapidFromFast(fast) {
-  const n = Number(fast);
-  if (!Number.isFinite(n)) return null;
-  return n * 1.25;
-}
-
 function gasUtilPercent(gasUsedRatio) {
   const n = Number(gasUsedRatio);
   if (!Number.isFinite(n)) return "-";
@@ -322,7 +299,7 @@ function gasUtilPercent(gasUsedRatio) {
 function renderGas(g, nextSec) {
   const standard = fmtGwei(g.safe);
   const fast = fmtGwei(g.fast);
-  const rapid = fmtGwei(g.rapid ?? rapidFromFast(g.fast));
+  const rapid = fmtGwei(g.rapid);
 
   return `
     <div class="gasWrap">
@@ -398,7 +375,6 @@ function startGasAutoRefresh() {
       next = 60;
       await loadGasOnce(next);
     } else {
-      // update counter on home
       const b = document.querySelector("#pageHome .gasNext b");
       if (b) b.textContent = `${next}s`;
     }
@@ -417,16 +393,13 @@ function stopGasAutoRefresh() {
 function handleRoute() {
   const { parts, query } = parseRoute();
 
-  // Home
   if (!parts.length) {
     startGasAutoRefresh();
     return;
   }
 
-  // Detail
   if (parts[0] === "address" && parts[1] && isAddress(parts[1])) {
     const tab = query.get("tab") === "erc20" ? "erc20" : "tx";
-    showPage("detail");
     loadDetail(parts[1], tab);
     return;
   }
@@ -441,7 +414,6 @@ function handleRoute() {
 window.addEventListener("DOMContentLoaded", () => {
   ensureSkeletonCss();
 
-  // Open
   $("open")?.addEventListener("click", () => {
     const q = $("query")?.value?.trim();
     if (!q) return;
@@ -451,16 +423,12 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const url = makeBaseScanUrl(q);
-    // tetap boleh link, tapi untuk non-address langsung open external
-    const link = $("link");
-    if (link) link.innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-    openExternal(url);
+    openExternal(makeBaseScanUrl(q));
   });
 
+  // Optional: kalau nanti kamu menambah tombol fetch, ini tetap aman
   $("fetch")?.addEventListener("click", () => $("open")?.click());
 
-  // Tabs (detail)
   $("tabTx")?.addEventListener("click", () => {
     const { parts } = parseRoute();
     const addr = parts?.[1];
@@ -473,31 +441,17 @@ window.addEventListener("DOMContentLoaded", () => {
     if (addr && isAddress(addr)) goDetail(addr, "erc20");
   });
 
-  // Back button (detail)
-  $("back")?.addEventListener("click", async () => {
-    // Prefer history back if possible
-    if (history.length > 1) {
-      history.back();
-      return;
-    }
-
-    // If no history, go home
-    goHome();
-
-    // Optional: if you want "close app" when already home:
-    // (requires SDK, documented) 0
-    // try { if (window.__fcSdk && await window.__fcSdk.isInMiniApp()) await window.__fcSdk.actions.close(); } catch {}
+  $("back")?.addEventListener("click", () => {
+    if (history.length > 1) history.back();
+    else goHome();
   });
 
-  // Enter
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
   });
 
-  // Router listeners
   window.addEventListener("hashchange", handleRoute);
 
-  // Init
   if (!location.hash) location.hash = "#/";
   handleRoute();
 });
