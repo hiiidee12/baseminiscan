@@ -20,23 +20,6 @@ function makeBaseScanUrl(q) {
   return `https://basescan.org/search?f=0&q=${encodeURIComponent(q)}`;
 }
 
-function toNum(v) {
-  if (v === null || v === undefined) return NaN;
-  if (typeof v === "number") return v;
-  if (typeof v === "string") {
-    const n = parseFloat(v.trim());
-    return Number.isFinite(n) ? n : NaN;
-  }
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
-}
-
-function weiToEthStr(wei, decimals = 6) {
-  const n = toNum(wei);
-  if (!Number.isFinite(n)) return null;
-  return (n / 1e18).toFixed(decimals);
-}
-
 async function openExternal(url) {
   try {
     if (window.__fcSdk && (await window.__fcSdk.isInMiniApp())) {
@@ -45,6 +28,101 @@ async function openExternal(url) {
     }
   } catch {}
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// BigInt-safe wei -> ETH string
+function weiToEthStr(wei, decimals = 6) {
+  try {
+    if (wei === null || wei === undefined) return null;
+    const w = BigInt(String(wei));
+    const base = 10n ** 18n;
+
+    const whole = w / base;
+    const frac = w % base;
+
+    const fracStr = frac.toString().padStart(18, "0").slice(0, decimals);
+    return `${whole.toString()}.${fracStr}`;
+  } catch {
+    return null;
+  }
+}
+
+// --- ERC20 amount formatter: raw integer -> human token amount (by decimals) ---
+function formatTokenAmount(raw, decimals, maxFrac = 6) {
+  try {
+    if (raw === null || raw === undefined) return "-";
+
+    // Etherscan biasanya string angka besar
+    const v = BigInt(String(raw));
+
+    let d = 0;
+    if (decimals === null || decimals === undefined || decimals === "") d = 0;
+    else d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0)); // clamp biar aman
+
+    if (d === 0) return v.toString();
+
+    const base = 10n ** BigInt(d);
+    const whole = v / base;
+    const frac = v % base;
+
+    // ambil maxFrac digit pecahan, trim nol
+    const fracStrFull = frac.toString().padStart(d, "0");
+    const fracStr = fracStrFull.slice(0, Math.min(maxFrac, d)).replace(/0+$/, "");
+
+    return fracStr ? `${whole.toString()}.${fracStr}` : whole.toString();
+  } catch {
+    // fallback aman
+    return String(raw);
+  }
+}
+
+// optional: ringkas angka besar (1.2K, 3.4M) tapi tetap aman
+function compactNumberString(s) {
+  // hanya kalau bisa jadi Number kecil-menengah
+  const n = Number(s);
+  if (!Number.isFinite(n)) return s;
+  const abs = Math.abs(n);
+  if (abs < 1000) return s;
+  if (abs < 1e6) return `${(n / 1e3).toFixed(2).replace(/\.?0+$/, "")}K`;
+  if (abs < 1e9) return `${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`;
+  if (abs < 1e12) return `${(n / 1e9).toFixed(2).replace(/\.?0+$/, "")}B`;
+  return s; // biarin kalau super besar
+}
+
+// ambil nilai txCount mentah dari response (bisa number/string), atau null kalau gak ada
+function getTxCountValue(j) {
+  const v = j?.totalTxCount ?? j?.txCount ?? null;
+  return v === undefined ? null : v;
+}
+
+// render txCount aman untuk DOM
+function renderTxCount(v) {
+  if (v === null || v === undefined) return "-";
+  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "-";
+  if (typeof v === "string") {
+    const s = v.trim();
+    return s ? s : "-";
+  }
+  return String(v);
+}
+
+/* =========================
+   Overview State (PENTING)
+========================= */
+
+const overviewState = {
+  address: null,
+  balanceWei: null,
+  txCount: null, // number | string("10000+") | null
+};
+
+function applyOverviewFromState() {
+  if ($("detailAddress")) $("detailAddress").textContent = overviewState.address || "-";
+
+  const eth = weiToEthStr(overviewState.balanceWei, 6);
+  if ($("detailBalance")) $("detailBalance").textContent = eth ? `${eth} ETH` : "-";
+
+  if ($("detailTxCount")) $("detailTxCount").textContent = renderTxCount(overviewState.txCount);
 }
 
 /* =========================
@@ -60,8 +138,6 @@ function setHash(path) {
 }
 
 function parseRoute() {
-  // #/  => home
-  // #/address/0xabc... => detail
   const h = getHash();
   const parts = h.split("/").filter(Boolean);
   if (parts.length >= 2 && parts[0] === "address") {
@@ -148,7 +224,7 @@ function tableSkeleton(rows = 6) {
 ========================= */
 
 function ageFromTs(ts) {
-  const t = toNum(ts) * 1000;
+  const t = Number(ts) * 1000;
   if (!Number.isFinite(t)) return "-";
   const d = Math.floor((Date.now() - t) / 1000);
   if (d < 60) return `${d}s ago`;
@@ -172,7 +248,7 @@ function renderTxTable(list = []) {
       <td class="small">${ageFromTs(tx.timeStamp)}</td>
       <td class="small">${shortHex(tx.from)}</td>
       <td class="small">${shortHex(tx.to)}</td>
-      <td>${weiToEthStr(tx.value) ?? "0"} ETH</td>
+      <td>${weiToEthStr(tx.value) ?? "0.000000"} ETH</td>
     </tr>
   `
     )
@@ -199,18 +275,25 @@ function renderTxTable(list = []) {
 function renderErc20Table(list = []) {
   const rows = list
     .slice(0, 25)
-    .map(
-      (t) => `
-    <tr>
-      <td>${shortHex(t.hash)}</td>
-      <td class="small">${ageFromTs(t.timeStamp)}</td>
-      <td>${t.tokenSymbol}</td>
-      <td class="small">${shortHex(t.from)}</td>
-      <td class="small">${shortHex(t.to)}</td>
-      <td>${t.value}</td>
-    </tr>
-  `
-    )
+    .map((t) => {
+      const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? 0;
+      const human = formatTokenAmount(t.value, dec, 6);
+      const show = compactNumberString(human);
+
+      return `
+        <tr>
+          <td>
+            <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
+            <div class="small">${t.tokenName ? String(t.tokenName).slice(0, 32) : ""}</div>
+          </td>
+          <td class="small">${ageFromTs(t.timeStamp)}</td>
+          <td>${t.tokenSymbol || "-"}</td>
+          <td class="small">${shortHex(t.from)}</td>
+          <td class="small">${shortHex(t.to)}</td>
+          <td title="${human}">${show}</td>
+        </tr>
+      `;
+    })
     .join("");
 
   return `
@@ -242,7 +325,7 @@ function hideLinkRow() {
   const link = $("link");
   if (!link) return;
   link.innerHTML = "";
-  link.style.display = "none"; // <- ini yang menghilangkan baris link di bawah profil
+  link.style.display = "none";
 }
 
 async function loadDetail(address, tab = "tx") {
@@ -253,39 +336,39 @@ async function loadDetail(address, tab = "tx") {
   showPage("detail");
   setActiveDetailTab(tab);
 
-  $("detailAddress").textContent = address;
+  overviewState.address = address;
 
-  // HAPUS link basescan di UI detail
   hideLinkRow();
+  applyOverviewFromState();
 
   const out = $("detailOutput");
-  out.innerHTML = overviewSkeleton() + tableSkeleton();
+  if (out) out.innerHTML = overviewSkeleton() + tableSkeleton();
 
   try {
-    const r = await fetch(`/api/address?address=${address}&tab=${tab}`, {
-      cache: "no-store",
-    });
+    const r = await fetch(
+      `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}`,
+      { cache: "no-store" }
+    );
     const j = await r.json();
     if (!r.ok || j?.error) throw j;
 
-    // overview (top)
-    const eth = weiToEthStr(j.balanceWei, 6);
-    $("detailBalance").textContent = eth ? `${eth} ETH` : "-";
+    overviewState.balanceWei = j.balanceWei ?? overviewState.balanceWei;
 
-    // txCount should be total (from API)
-    const total = toNum(j.totalTxCount);
-    $("detailTxCount").textContent = Number.isFinite(total) ? String(total) : "-";
+    const newCount = getTxCountValue(j);
+    if (newCount !== null && newCount !== undefined) {
+      overviewState.txCount = newCount;
+    }
+    applyOverviewFromState();
 
-    // table (tab)
-    out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
+    if (out) {
+      out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
 
-    out.querySelectorAll("[data-open]").forEach((el) => {
-      el.onclick = () => openExternal(el.dataset.open);
-    });
+      out.querySelectorAll("[data-open]").forEach((el) => {
+        el.onclick = () => openExternal(el.dataset.open);
+      });
+    }
   } catch (e) {
-    $("detailTxCount").textContent = "-";
-    $("detailBalance").textContent = "-";
-    out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
+    if (out) out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
   }
 }
 
@@ -294,6 +377,17 @@ async function loadDetail(address, tab = "tx") {
 ========================= */
 
 let __gasTimer = null;
+
+function toNum(v) {
+  if (v === null || v === undefined) return NaN;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.trim());
+    return Number.isFinite(n) ? n : NaN;
+  }
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
 
 function formatGwei(v) {
   const n = toNum(v);
@@ -444,7 +538,6 @@ function handleRoute() {
 window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
-  // pastikan link row tidak muncul di awal
   hideLinkRow();
 
   // Home
@@ -476,6 +569,5 @@ window.addEventListener("DOMContentLoaded", () => {
     if (__detailAddress) loadDetail(__detailAddress, "erc20");
   });
 
-  // init route
   handleRoute();
 });
