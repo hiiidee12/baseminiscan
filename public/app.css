@@ -49,6 +49,9 @@ body {
   box-shadow:
     0 30px 80px rgba(0,60,180,.45),
     inset 0 1px 0 rgba(255,255,255,.45);
+
+  /* penting untuk floating Back */
+  position: relative;
 }
 
 /* =====================
@@ -170,6 +173,34 @@ button.secondary {
 }
 
 /* =====================
+   DETAIL - TOP BAR (Back floating)
+===================== */
+
+.detailTop {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 5;
+  pointer-events: none; /* biar hanya tombolnya yang clickable */
+}
+
+.backBtn {
+  pointer-events: auto;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+/* hide link basescan under profile (tetap ada elemennya) */
+#link {
+  display: none !important;
+}
+
+/* =====================
    TABS
 ===================== */
 
@@ -238,14 +269,6 @@ a {
 /* =====================
    DETAIL HEADER
 ===================== */
-
-.detailTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
 
 .detailHeader {
   margin-top: 6px;
