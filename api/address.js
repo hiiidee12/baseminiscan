@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   try {
     const address = (req.query.address || "").toString().trim();
-    const tab = (req.query.tab || "tx").toString().trim(); // tx | erc20
+    const tab = (req.query.tab || "tx").toString().trim().toLowerCase(); // tx | erc20
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
     const offset = Math.min(25, Math.max(1, parseInt(req.query.offset || "25", 10)));
 
@@ -10,10 +10,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid address" });
     }
 
-    // === MULTI API KEY (ROTATE / FALLBACK) ===
+    // === 2 API KEYS ONLY ===
     const API_KEYS = [
       process.env.ETHERSCAN_API_KEY,
-      process.env.ETHERSCAN_KEY_2,
+      process.env.ETHERSCAN_API_KEY_2,
     ].filter(Boolean);
 
     if (API_KEYS.length === 0) {
@@ -34,7 +34,6 @@ export default async function handler(req, res) {
 
     const isRateLimited = (j) => {
       const msg = (j?.result || j?.message || "").toString().toLowerCase();
-      // Etherscan biasanya balikin "Max rate limit reached" di result/message
       return msg.includes("rate limit") || msg.includes("max rate") || msg.includes("too many");
     };
 
@@ -68,21 +67,20 @@ export default async function handler(req, res) {
         apikey,
       });
 
-    // Try each key in order; if rate-limited / error -> next key
+    // Try each key in order; only fall back when error / rate limited
     const tryWithKeys = async (fnPerKey) => {
-      let last = null;
+      let lastErr = null;
       for (const apikey of API_KEYS) {
         try {
-          const out = await fnPerKey(apikey);
-          return out;
+          return await fnPerKey(apikey);
         } catch (e) {
-          last = e;
+          lastErr = e;
         }
       }
-      throw last || new Error("All API keys failed");
+      throw lastErr || new Error("All API keys failed");
     };
 
-    // --- Fetch balance + tab list (25 items default) ---
+    // --- Fetch balance + tab list ---
     const { balanceJson, listJson, usedKey } = await tryWithKeys(async (apikey) => {
       const balanceUrl = buildBalanceUrl(apikey);
       const listUrl = buildListUrl(apikey, listAction, page, offset);
@@ -108,9 +106,7 @@ export default async function handler(req, res) {
     });
 
     // --- Compute TOTAL txCount (for normal txlist only) ---
-    // We only compute total normal tx count (not erc20 transfers count)
-    // Best-effort with a cap to avoid hammering API.
-    const MAX_PAGES = 10; // 10*1000 = 10k tx max counted; if more => "10000+"
+    const MAX_PAGES = 10;       // cap safety
     const COUNT_PAGE_SIZE = 1000;
 
     const countAllTx = async () => {
@@ -139,11 +135,12 @@ export default async function handler(req, res) {
     };
 
     let txCount = null;
-    try {
-      txCount = await countAllTx();
-    } catch {
-      // If counting fails (rate limit), still return list+balance
-      txCount = null;
+    if (tab !== "erc20") {
+      try {
+        txCount = await countAllTx();
+      } catch {
+        txCount = null;
+      }
     }
 
     // Cache (penting buat limit)
@@ -154,7 +151,11 @@ export default async function handler(req, res) {
       chain: "base",
       tab,
       balanceWei: balanceJson.result,
-      txCount, // ✅ total normal tx count (best-effort). could be number, "10000+", or null
+
+      // ✅ BOTH NAMES (biar match app.js dan tetap kompatibel)
+      totalTxCount: txCount,
+      txCount: txCount,
+
       list: Array.isArray(listJson.result) ? listJson.result : [],
       meta: {
         page,
