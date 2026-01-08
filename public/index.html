@@ -23,6 +23,7 @@
   <div class="wrap" id="wrap">
     <div class="card">
 
+      <!-- Profile header (tetap sama) -->
       <div class="profile">
         <img id="pfp" class="pfp" alt="pfp" />
         <div class="profileInfo">
@@ -35,29 +36,63 @@
         </div>
       </div>
 
-      <h1>Base Mini Scan</h1>
+      <!-- ============= HOME PAGE ============= -->
+      <section id="pageHome" data-page="home">
+        <h1>Base Mini Scan</h1>
 
-      <div class="row">
-        <input
-          id="query"
-          placeholder="Paste address / tx hash / block number"
-          autocomplete="off"
-        />
+        <div class="row">
+          <input
+            id="query"
+            placeholder="Paste address / tx hash / block number"
+            autocomplete="off"
+          />
+          <button id="open">Open</button>
+        </div>
 
-        <button id="open">Open</button>
-        <button id="fetch" class="secondary">Fetch</button>
+        <!-- Gas tracker area (home only) -->
+        <div class="sectionHead">
+          <div class="sectionTitle">Base Gas Tracker ⛽</div>
+          <div class="muted gasNext" id="gasNext">Next update in <b>—</b></div>
+        </div>
+
+        <!-- tempat render gas cards -->
+        <div id="gasOutput"></div>
+
+        <div class="muted">Farcaster Mini App • Base Network</div>
+      </section>
+
+      <!-- ============= DETAIL PAGE ============= -->
+      <section id="pageDetail" data-page="detail" style="display:none">
+        <div class="detailTop">
+          <button id="back" class="secondary">← Back</button>
+          <div class="muted" id="link"></div>
+        </div>
+
+        <div class="detailHeader">
+          <div class="detailLabel muted">Wallet Address</div>
+          <div class="detailAddress" id="detailAddress">-</div>
+
+          <div class="detailStats">
+            <div class="statBox">
+              <div class="muted">ETH Balance</div>
+              <div class="statValue" id="detailBalance">-</div>
+            </div>
+            <div class="statBox">
+              <div class="muted">Total Tx</div>
+              <div class="statValue" id="detailTxCount">-</div>
+            </div>
+          </div>
+        </div>
 
         <div class="tabs">
           <button id="tabTx" class="secondary">Transactions</button>
           <button id="tabErc20" class="secondary">ERC-20 Transfers</button>
-          <button id="gas" class="secondary">Gas</button>
         </div>
-      </div>
 
-      <div class="muted" id="link"></div>
-      <div id="output"></div>
+        <div id="detailOutput"></div>
 
-      <div class="muted">Farcaster Mini App • Base Network</div>
+        <div class="muted">Farcaster Mini App • Base Network</div>
+      </section>
 
     </div>
   </div>
