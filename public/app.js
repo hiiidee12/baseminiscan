@@ -37,41 +37,91 @@ async function openExternal(url) {
 }
 
 /* =========================
-   Tabs
+   Tiny skeleton CSS (injected once)
 ========================= */
 
+function ensureSkeletonCss() {
+  if (document.getElementById("__sk_css")) return;
+  const s = document.createElement("style");
+  s.id = "__sk_css";
+  s.textContent = `
+    .sk {
+      position: relative;
+      overflow: hidden;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 14px;
+    }
+    .sk::after {
+      content: "";
+      position: absolute;
+      top: 0; left: -150%;
+      width: 150%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+      animation: sk 1.15s ease-in-out infinite;
+    }
+    @keyframes sk { 0% { left: -150% } 100% { left: 150% } }
+    .skline { height: 12px; margin: 10px 0; }
+    .skline.sm { height: 10px; opacity: .9 }
+    .skline.lg { height: 16px; opacity: 1 }
+    .skrow { height: 44px; margin-top: 10px; }
+  `;
+  document.head.appendChild(s);
+}
+
+/* =========================
+   Simple Router (hash)
+   - #/                 => Home
+   - #/address/0x...?tab=tx|erc20 => Detail
+========================= */
+
+function goHome() {
+  location.hash = "#/";
+}
+
+function goDetail(address, tab = "tx") {
+  location.hash = `#/address/${address}?tab=${encodeURIComponent(tab)}`;
+}
+
+function parseRoute() {
+  const raw = (location.hash || "#/").slice(1);
+  const [path, qs] = raw.split("?");
+  const parts = path.split("/").filter(Boolean);
+  const query = new URLSearchParams(qs || "");
+  return { parts, query };
+}
+
+/* =========================
+   UI show/hide
+========================= */
+
+function showPage(which) {
+  const home = $("pageHome");
+  const detail = $("pageDetail");
+  if (!home || !detail) return;
+
+  if (which === "detail") {
+    home.style.display = "none";
+    detail.style.display = "";
+  } else {
+    detail.style.display = "none";
+    home.style.display = "";
+  }
+}
+
 function setActiveTab(tab) {
-  ["tabTx", "tabErc20", "gas"].forEach((id) => {
+  ["tabTx", "tabErc20"].forEach((id) => {
     const el = $(id);
     if (el) el.classList.add("secondary");
   });
-  const active =
-    tab === "tx" ? "tabTx" : tab === "erc20" ? "tabErc20" : "gas";
+  const active = tab === "erc20" ? "tabErc20" : "tabTx";
   const el = $(active);
   if (el) el.classList.remove("secondary");
 }
 
 /* =========================
-   Render Address
+   Render: tables
 ========================= */
-
-function renderOverview(address, balanceWei) {
-  const eth = weiToEthStr(balanceWei, 6);
-  return `
-    <div class="resultCard">
-      <div class="badge">Address</div>
-      <div style="margin-top:10px">
-        <b class="click" data-open="${makeBaseScanUrl(address)}">
-          ${shortHex(address, 8, 6)}
-        </b>
-      </div>
-      <div style="margin-top:8px">
-        Balance: <b>${eth ?? balanceWei} ETH</b>
-      </div>
-      <div class="muted">Raw: ${balanceWei} wei</div>
-    </div>
-  `;
-}
 
 function ageFromTs(ts) {
   const t = Number(ts) * 1000;
@@ -84,25 +134,26 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list = []) {
-  const rows = list
-    .slice(0, 25)
-    .map(
-      (tx) => `
-    <tr>
-      <td>
-        <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">
-          ${shortHex(tx.hash)}
-        </span>
-        <div class="small">Block ${tx.blockNumber}</div>
-      </td>
-      <td class="small">${ageFromTs(tx.timeStamp)}</td>
-      <td class="small">${shortHex(tx.from)}</td>
-      <td class="small">${shortHex(tx.to)}</td>
-      <td>${weiToEthStr(tx.value) ?? "0"} ETH</td>
-    </tr>
-  `
-    )
-    .join("");
+  const rows = list.slice(0, 25).map((tx) => {
+    const hash = tx.hash || tx.transactionHash || "-";
+    const from = tx.from || "-";
+    const to = tx.to || "-";
+    const block = tx.blockNumber || "-";
+    const value = tx.value || "0";
+    const age = tx.timeStamp ? ageFromTs(tx.timeStamp) : "-";
+    return `
+      <tr>
+        <td>
+          <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
+          <div class="small">Block ${block}</div>
+        </td>
+        <td class="small">${age}</td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
+        <td>${weiToEthStr(value) ?? "0"} ETH</td>
+      </tr>
+    `;
+  }).join("");
 
   return `
     <div class="tableWrap">
@@ -123,21 +174,24 @@ function renderTxTable(list = []) {
 }
 
 function renderErc20Table(list = []) {
-  const rows = list
-    .slice(0, 25)
-    .map(
-      (t) => `
-    <tr>
-      <td>${shortHex(t.hash)}</td>
-      <td class="small">${ageFromTs(t.timeStamp)}</td>
-      <td>${t.tokenSymbol || "-"}</td>
-      <td class="small">${shortHex(t.from)}</td>
-      <td class="small">${shortHex(t.to)}</td>
-      <td>${t.value ?? "-"}</td>
-    </tr>
-  `
-    )
-    .join("");
+  const rows = list.slice(0, 25).map((t) => {
+    const hash = t.hash || t.transactionHash || "-";
+    const token = t.tokenSymbol || "-";
+    const from = t.from || "-";
+    const to = t.to || "-";
+    const age = t.timeStamp ? ageFromTs(t.timeStamp) : "-";
+    const amount = t.value ?? "-"; // (format decimals tetap ditangani backend/formatters kamu)
+    return `
+      <tr>
+        <td><span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span></td>
+        <td class="small">${age}</td>
+        <td>${token}</td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(from)}">${shortHex(from)}</span></td>
+        <td class="small"><span class="click" data-open="${makeBaseScanUrl(to)}">${shortHex(to)}</span></td>
+        <td>${amount}</td>
+      </tr>
+    `;
+  }).join("");
 
   return `
     <div class="tableWrap">
@@ -158,47 +212,91 @@ function renderErc20Table(list = []) {
 }
 
 /* =========================
-   Address Loader
+   Detail skeleton + loader
 ========================= */
 
-async function loadAddressView(address, tab = "tx") {
-  stopGasAutoRefresh();
+function renderDetailSkeleton(tab = "tx") {
+  ensureSkeletonCss();
   setActiveTab(tab);
 
-  const out = $("output");
-  out.innerHTML = `<div class="muted">Loading…</div>`;
+  const a = $("detailAddress");
+  const b = $("detailBalance");
+  const c = $("detailTxCount");
+  const out = $("detailOutput");
+
+  if (a) a.innerHTML = `<div class="sk skline lg"></div>`;
+  if (b) b.innerHTML = `<div class="sk skline"></div>`;
+  if (c) c.innerHTML = `<div class="sk skline"></div>`;
+
+  if (out) {
+    out.innerHTML = `
+      <div class="resultCard">
+        <div class="sk skline lg"></div>
+        <div class="sk skline"></div>
+        <div class="sk skline sm"></div>
+      </div>
+      <div class="tableWrap">
+        <div class="sk skrow"></div>
+        <div class="sk skrow"></div>
+        <div class="sk skrow"></div>
+      </div>
+    `;
+  }
+}
+
+async function loadDetail(address, tab = "tx") {
+  stopGasAutoRefresh();
+  showPage("detail");
+  renderDetailSkeleton(tab);
 
   try {
     const r = await fetch(
-      `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}`,
+      `/api/address?address=${encodeURIComponent(address)}&tab=${encodeURIComponent(tab)}&offset=25&page=1`,
       { cache: "no-store" }
     );
     const j = await r.json();
-
     if (!r.ok || j?.error) throw j;
 
-    const html =
-      renderOverview(address, j.balanceWei) +
-      (tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list));
+    // Fill header fields
+    const addrEl = $("detailAddress");
+    const balEl = $("detailBalance");
+    const cntEl = $("detailTxCount");
 
-    out.innerHTML = html;
+    if (addrEl) {
+      addrEl.innerHTML = `
+        <span class="click" data-open="${makeBaseScanUrl(address)}">${address}</span>
+        <span class="muted" style="margin-left:10px">${shortHex(address, 8, 6)}</span>
+      `;
+      addrEl.querySelectorAll("[data-open]").forEach((el) => {
+        el.onclick = () => openExternal(el.dataset.open);
+      });
+    }
 
-    out.querySelectorAll("[data-open]").forEach((el) => {
-      el.onclick = () => openExternal(el.dataset.open);
-    });
+    const eth = weiToEthStr(j.balanceWei, 6);
+    if (balEl) balEl.textContent = `${eth ?? j.balanceWei} ETH`;
+
+    // ✅ total txCount from backend (number OR string like "10000+")
+    const txCount = j.txCount ?? j.totalTxCount ?? "-";
+    if (cntEl) cntEl.textContent = typeof txCount === "number" ? txCount.toLocaleString() : String(txCount);
+
+    // Render table
+    setActiveTab(tab);
+    const out = $("detailOutput");
+    if (out) {
+      out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
+
+      out.querySelectorAll("[data-open]").forEach((el) => {
+        el.onclick = () => openExternal(el.dataset.open);
+      });
+    }
   } catch (e) {
-    const msg =
-      typeof e === "string"
-        ? e
-        : e?.message
-        ? e.message
-        : JSON.stringify(e, null, 2);
-    out.innerHTML = `<pre>${msg}</pre>`;
+    const out = $("detailOutput");
+    if (out) out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
   }
 }
 
 /* =========================
-   GAS UI (embedded fix)
+   GAS (Home only, 1 minute refresh)
 ========================= */
 
 let __gasTimer = null;
@@ -221,43 +319,10 @@ function gasUtilPercent(gasUsedRatio) {
   return (n * 100).toFixed(2) + "%";
 }
 
-function usdFrom(gwei, gasUnits, ethUsd) {
-  const g = Number(gwei);
-  const u = Number(gasUnits);
-  const p = Number(ethUsd);
-  if (!Number.isFinite(g) || !Number.isFinite(u) || !Number.isFinite(p)) return "-";
-  const usd = (g * 1e-9) * u * p;
-  if (!Number.isFinite(usd)) return "-";
-  return usd < 0.01 ? "< $0.01" : `$${usd.toFixed(3)}`;
-}
-
 function renderGas(g, nextSec) {
   const standard = fmtGwei(g.safe);
   const fast = fmtGwei(g.fast);
   const rapid = fmtGwei(g.rapid ?? rapidFromFast(g.fast));
-
-  const ethUsd = Number(g.ethUsd);
-  const ethUsdStr = Number.isFinite(ethUsd) ? `$${ethUsd.toFixed(2)}` : "-";
-
-  // gas units (perkiraan)
-  const UNITS = {
-    transfer: 21000,
-    erc20: 65000,
-    swap: 150000,
-    lp: 220000,
-  };
-
-  const sUsdTransfer = usdFrom(g.safe, UNITS.transfer, g.ethUsd);
-  const fUsdTransfer = usdFrom(g.fast, UNITS.transfer, g.ethUsd);
-  const rUsdTransfer = usdFrom(g.rapid ?? rapidFromFast(g.fast), UNITS.transfer, g.ethUsd);
-
-  const sUsdSwap = usdFrom(g.safe, UNITS.swap, g.ethUsd);
-  const fUsdSwap = usdFrom(g.fast, UNITS.swap, g.ethUsd);
-  const rUsdSwap = usdFrom(g.rapid ?? rapidFromFast(g.fast), UNITS.swap, g.ethUsd);
-
-  const sUsdLp = usdFrom(g.safe, UNITS.lp, g.ethUsd);
-  const fUsdLp = usdFrom(g.fast, UNITS.lp, g.ethUsd);
-  const rUsdLp = usdFrom(g.rapid ?? rapidFromFast(g.fast), UNITS.lp, g.ethUsd);
 
   return `
     <div class="gasWrap">
@@ -270,25 +335,24 @@ function renderGas(g, nextSec) {
         <div class="gasCard">
           <div class="gasCardHead"><div class="gasEmoji">🙂</div> Standard</div>
           <div class="gasValue standard">${standard} Gwei</div>
-          <div class="gasSub">${sUsdTransfer} • ~ 12–16 secs</div>
+          <div class="gasSub">~ 12–16 secs</div>
         </div>
 
         <div class="gasCard">
           <div class="gasCardHead"><div class="gasEmoji">😄</div> Fast</div>
           <div class="gasValue fast">${fast} Gwei</div>
-          <div class="gasSub">${fUsdTransfer} • ~ 6–8 secs</div>
+          <div class="gasSub">~ 6–8 secs</div>
         </div>
 
         <div class="gasCard center">
           <div class="gasCardHead"><div class="gasEmoji">🚀</div> Rapid</div>
           <div class="gasValue rapid">${rapid} Gwei</div>
-          <div class="gasSub">${rUsdTransfer} • ~ 2–3 secs</div>
+          <div class="gasSub">~ 2–3 secs</div>
         </div>
       </div>
 
       <div class="resultCard" style="padding:14px;">
         <div style="font-weight:800;margin-bottom:10px;">Additional Info</div>
-
         <div class="gasInfoGrid">
           <div class="gasInfoCard">
             <div class="gasInfoLabel">LAST BLOCK</div>
@@ -299,56 +363,16 @@ function renderGas(g, nextSec) {
             <div class="gasInfoValue">${gasUtilPercent(g.gasUsedRatio)}</div>
           </div>
         </div>
-
-        <div class="gasMeta muted" style="margin-top:10px;">
-          ETH/USD: <b>${ethUsdStr}</b> • Source: ${g.source ?? "-"}
-        </div>
-
-        <div style="font-weight:800;margin:14px 0 8px;">Featured Actions</div>
-        <div class="tableWrap">
-          <div class="tableScroll">
-            <table>
-              <thead>
-                <tr><th>Action</th><th>Low</th><th>Average</th><th>High</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>ERC-20 Transfer</td>
-                  <td>${sUsdTransfer}</td>
-                  <td>${fUsdTransfer}</td>
-                  <td>${rUsdTransfer}</td>
-                </tr>
-                <tr>
-                  <td>Swap</td>
-                  <td>${sUsdSwap}</td>
-                  <td>${fUsdSwap}</td>
-                  <td>${rUsdSwap}</td>
-                </tr>
-                <tr>
-                  <td>Add/Remove LP</td>
-                  <td>${sUsdLp}</td>
-                  <td>${fUsdLp}</td>
-                  <td>${rUsdLp}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="muted" style="margin-top:10px;">
-          Note: estimasi USD = (gwei × gasUnits) × ETH/USD
-        </div>
+        <div class="gasFoot">Source: ${g.source ?? "-"}</div>
       </div>
     </div>
   `;
 }
 
-/* =========================
-   GAS (1 minute refresh)
-========================= */
-
 async function loadGasOnce(next) {
-  const out = $("output");
+  const out = $("gasOutput");
+  if (!out) return;
+
   out.innerHTML = `<div class="muted">Loading gas…</div>`;
   try {
     const r = await fetch("/api/gas", { cache: "no-store" });
@@ -356,30 +380,26 @@ async function loadGasOnce(next) {
     if (!r.ok || j?.error) throw j;
     out.innerHTML = renderGas(j, next);
   } catch (e) {
-    const msg =
-      typeof e === "string"
-        ? e
-        : e?.message
-        ? e.message
-        : JSON.stringify(e, null, 2);
-    out.innerHTML = `<pre>${msg}</pre>`;
+    out.innerHTML = `<pre>${JSON.stringify(e, null, 2)}</pre>`;
   }
 }
 
 function startGasAutoRefresh() {
   stopGasAutoRefresh();
-  setActiveTab("gas");
+  showPage("home");
 
   let next = 60;
   loadGasOnce(next);
 
   __gasTimer = setInterval(async () => {
-    next--;
+    next -= 1;
+
     if (next <= 0) {
       next = 60;
       await loadGasOnce(next);
     } else {
-      const b = document.querySelector(".gasNext b");
+      // update counter on home
+      const b = document.querySelector("#pageHome .gasNext b");
       if (b) b.textContent = `${next}s`;
     }
   }, 1000);
@@ -391,40 +411,93 @@ function stopGasAutoRefresh() {
 }
 
 /* =========================
-   UI Bind
+   Router handler
+========================= */
+
+function handleRoute() {
+  const { parts, query } = parseRoute();
+
+  // Home
+  if (!parts.length) {
+    startGasAutoRefresh();
+    return;
+  }
+
+  // Detail
+  if (parts[0] === "address" && parts[1] && isAddress(parts[1])) {
+    const tab = query.get("tab") === "erc20" ? "erc20" : "tx";
+    showPage("detail");
+    loadDetail(parts[1], tab);
+    return;
+  }
+
+  goHome();
+}
+
+/* =========================
+   Bind
 ========================= */
 
 window.addEventListener("DOMContentLoaded", () => {
-  $("open")?.addEventListener("click", async () => {
-    const q = $("query").value.trim();
+  ensureSkeletonCss();
+
+  // Open
+  $("open")?.addEventListener("click", () => {
+    const q = $("query")?.value?.trim();
     if (!q) return;
 
     if (isAddress(q)) {
-      $("link").textContent = "";
-      await loadAddressView(q, "tx");
-    } else {
-      stopGasAutoRefresh();
-      const url = makeBaseScanUrl(q);
-      $("link").innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-      openExternal(url);
+      goDetail(q, "tx");
+      return;
     }
+
+    const url = makeBaseScanUrl(q);
+    // tetap boleh link, tapi untuk non-address langsung open external
+    const link = $("link");
+    if (link) link.innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+    openExternal(url);
   });
 
-  $("fetch")?.addEventListener("click", () => $("open").click());
+  $("fetch")?.addEventListener("click", () => $("open")?.click());
 
+  // Tabs (detail)
   $("tabTx")?.addEventListener("click", () => {
-    const q = $("query").value.trim();
-    if (isAddress(q)) loadAddressView(q, "tx");
+    const { parts } = parseRoute();
+    const addr = parts?.[1];
+    if (addr && isAddress(addr)) goDetail(addr, "tx");
   });
 
   $("tabErc20")?.addEventListener("click", () => {
-    const q = $("query").value.trim();
-    if (isAddress(q)) loadAddressView(q, "erc20");
+    const { parts } = parseRoute();
+    const addr = parts?.[1];
+    if (addr && isAddress(addr)) goDetail(addr, "erc20");
   });
 
-  $("gas")?.addEventListener("click", startGasAutoRefresh);
+  // Back button (detail)
+  $("back")?.addEventListener("click", async () => {
+    // Prefer history back if possible
+    if (history.length > 1) {
+      history.back();
+      return;
+    }
 
+    // If no history, go home
+    goHome();
+
+    // Optional: if you want "close app" when already home:
+    // (requires SDK, documented) 0
+    // try { if (window.__fcSdk && await window.__fcSdk.isInMiniApp()) await window.__fcSdk.actions.close(); } catch {}
+  });
+
+  // Enter
   $("query")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("open").click();
+    if (e.key === "Enter") $("open")?.click();
   });
+
+  // Router listeners
+  window.addEventListener("hashchange", handleRoute);
+
+  // Init
+  if (!location.hash) location.hash = "#/";
+  handleRoute();
 });
