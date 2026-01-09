@@ -660,19 +660,7 @@ function renderGas(data) {
         <div class="gasLabel">🚀 Rapid</div>
         <div class="gasValue">${rapid} <span class="unit">Gwei</span></div>
         <div class="muted">~ 2–3 secs</div>
-      </div>
-      <div class="resultCard">
-        <div style="font-weight:800; font-size:16px;">Additional Info</div>
-        <div class="small muted" style="margin-top:10px;">
-          <div>LAST BLOCK</div>
-          <div style="font-size:20px; color:#fff; font-weight:800;">${lastBlock}</div>
-        </div>
-        <div class="small muted" style="margin-top:10px;">
-          <div>AVG. UTILIZATION</div>
-          <div style="font-size:20px; color:#fff; font-weight:800;">${util}</div>
-        </div>
-        <div class="muted" style="margin-top:10px;">Source: ${src}</div>
-      </div>
+      </div>  
     </div>
   `;
 }
