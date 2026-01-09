@@ -14,27 +14,32 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY,
       process.env.ETHERSCAN_API_KEY_2,
       process.env.ETHERSCAN_API_KEY_3,
+      process.env.ETHERSCAN_API_KEY_4,
     ].filter(Boolean);
 
     const TX_KEYS = [
-      process.env.ETHERSCAN_API_KEY_4,
       process.env.ETHERSCAN_API_KEY_5,
       process.env.ETHERSCAN_API_KEY_6,
+      process.env.ETHERSCAN_API_KEY_7,
+      process.env.ETHERSCAN_API_KEY_8,
     ].filter(Boolean);
 
     const ERC20_KEYS = [
-      process.env.ETHERSCAN_API_KEY_7,
-      process.env.ETHERSCAN_API_KEY_8,
       process.env.ETHERSCAN_API_KEY_9,
-    ].filter(Boolean);
-
-    const COUNT_KEYS = [
       process.env.ETHERSCAN_API_KEY_10,
       process.env.ETHERSCAN_API_KEY_11,
       process.env.ETHERSCAN_API_KEY_12,
+    ].filter(Boolean);
+
+    const COUNT_KEYS = [
       process.env.ETHERSCAN_API_KEY_13,
       process.env.ETHERSCAN_API_KEY_14,
       process.env.ETHERSCAN_API_KEY_15,
+      process.env.ETHERSCAN_API_KEY_16,
+      process.env.ETHERSCAN_API_KEY_17,
+      process.env.ETHERSCAN_API_KEY_18,
+      process.env.ETHERSCAN_API_KEY_19,
+      process.env.ETHERSCAN_API_KEY_20,
     ].filter(Boolean);
 
     const API = "https://api.etherscan.io/v2/api";
