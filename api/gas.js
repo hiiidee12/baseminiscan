@@ -21,7 +21,6 @@ function withTimeout(ms) {
 
 function hexToBigInt(hex) {
   if (!hex || typeof hex !== "string") return 0n;
-  // hex from RPC is like "0x12ab..."
   try {
     return BigInt(hex);
   } catch {
@@ -30,7 +29,6 @@ function hexToBigInt(hex) {
 }
 
 function weiToGwei(weiBig) {
-  // Keep as Number for UI; gasPrice on Base is small enough to safely fit Number.
   const n = Number(weiBig);
   if (!Number.isFinite(n) || n < 0) return null;
   const gwei = n / 1e9;
@@ -47,6 +45,115 @@ function ratioToPctString(ratio01, digits = 2) {
   if (!Number.isFinite(ratio01)) return null;
   return (ratio01 * 100).toFixed(digits);
 }
+
+/* =========================
+   Featured Actions (NEW)
+========================= */
+// Estimasi gas limit (perkiraan umum EVM/Base, mirip yang explorer tampilkan)
+const ACTION_GAS_LIMITS = {
+  erc20Transfer: 65000, // ERC-20 transfer
+  swap: 150000,         // swap (DEX)
+  addRemoveLP: 200000,  // add/remove liquidity
+};
+
+// gwei * gasLimit -> ETH
+function feeEthFromGwei(gwei, gasLimit) {
+  if (!Number.isFinite(gwei) || !Number.isFinite(gasLimit) || gasLimit <= 0) return null;
+  return (gwei * gasLimit) / 1e9;
+}
+
+// ETH -> USD
+function feeUsdFromEth(feeEth, ethUsd) {
+  if (!Number.isFinite(feeEth) || !Number.isFinite(ethUsd) || ethUsd <= 0) return null;
+  return feeEth * ethUsd;
+}
+
+// format USD kecil biar mirip explorer (mis. $0.000349)
+function formatUsdSmall(n) {
+  if (!Number.isFinite(n)) return null;
+  // tampilkan 6 desimal untuk nilai kecil, tapi tetap rapih
+  if (n < 1) return `$${n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return `$${n.toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}`;
+}
+
+// Buat tabel featuredActions pakai 3 tier: low/avg/high
+function buildFeaturedActions({ safeGwei, fastGwei, rapidGwei, ethUsd }) {
+  const tiers = {
+    low: safeGwei,
+    avg: fastGwei,
+    high: rapidGwei,
+  };
+
+  const makeRow = (gasLimit) => {
+    const lowEth = feeEthFromGwei(tiers.low, gasLimit);
+    const avgEth = feeEthFromGwei(tiers.avg, gasLimit);
+    const highEth = feeEthFromGwei(tiers.high, gasLimit);
+
+    const lowUsd = feeUsdFromEth(lowEth, ethUsd);
+    const avgUsd = feeUsdFromEth(avgEth, ethUsd);
+    const highUsd = feeUsdFromEth(highEth, ethUsd);
+
+    return {
+      gasLimit,
+      low: {
+        gwei: round(tiers.low, 3),
+        eth: lowEth,
+        usd: lowUsd,
+        usdText: formatUsdSmall(lowUsd),
+      },
+      avg: {
+        gwei: round(tiers.avg, 3),
+        eth: avgEth,
+        usd: avgUsd,
+        usdText: formatUsdSmall(avgUsd),
+      },
+      high: {
+        gwei: round(tiers.high, 3),
+        eth: highEth,
+        usd: highUsd,
+        usdText: formatUsdSmall(highUsd),
+      },
+    };
+  };
+
+  return {
+    // format ringkas untuk UI (langsung string $...)
+    simple: {
+      erc20Transfer: {
+        low: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.low, ACTION_GAS_LIMITS.erc20Transfer), ethUsd)),
+        avg: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.avg, ACTION_GAS_LIMITS.erc20Transfer), ethUsd)),
+        high: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.high, ACTION_GAS_LIMITS.erc20Transfer), ethUsd)),
+      },
+      swap: {
+        low: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.low, ACTION_GAS_LIMITS.swap), ethUsd)),
+        avg: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.avg, ACTION_GAS_LIMITS.swap), ethUsd)),
+        high: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.high, ACTION_GAS_LIMITS.swap), ethUsd)),
+      },
+      addRemoveLP: {
+        low: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.low, ACTION_GAS_LIMITS.addRemoveLP), ethUsd)),
+        avg: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.avg, ACTION_GAS_LIMITS.addRemoveLP), ethUsd)),
+        high: formatUsdSmall(feeUsdFromEth(feeEthFromGwei(tiers.high, ACTION_GAS_LIMITS.addRemoveLP), ethUsd)),
+      },
+    },
+
+    // format lengkap (kalau mau tampil detail atau debug)
+    detailed: {
+      erc20Transfer: makeRow(ACTION_GAS_LIMITS.erc20Transfer),
+      swap: makeRow(ACTION_GAS_LIMITS.swap),
+      addRemoveLP: makeRow(ACTION_GAS_LIMITS.addRemoveLP),
+    },
+
+    // biar gampang dipakai render tabel
+    rows: [
+      { key: "erc20Transfer", label: "ERC-20 Transfer", ...makeRow(ACTION_GAS_LIMITS.erc20Transfer) },
+      { key: "swap", label: "Swap", ...makeRow(ACTION_GAS_LIMITS.swap) },
+      { key: "addRemoveLP", label: "Add/Remove LP", ...makeRow(ACTION_GAS_LIMITS.addRemoveLP) },
+    ],
+  };
+}
+/* =========================
+   End Featured Actions
+========================= */
 
 async function rpcCall(url, method, params = []) {
   const { signal, cancel } = withTimeout(RPC_TIMEOUT_MS);
@@ -114,7 +221,6 @@ async function fetchEthUsd() {
 }
 
 module.exports = async (req, res) => {
-  // Only GET
   if (req.method !== "GET") {
     res.statusCode = 405;
     res.setHeader("content-type", "application/json");
@@ -142,10 +248,9 @@ module.exports = async (req, res) => {
     const gasUsed = block?.gasUsed ? hexToBigInt(block.gasUsed) : null;
     const gasLimit = block?.gasLimit ? hexToBigInt(block.gasLimit) : null;
 
-    let gasUsedRatio = null; // 0..1 (number)
-    let gasUsedPct = null;   // "19.58" (string) for easy UI
+    let gasUsedRatio = null;
+    let gasUsedPct = null;
     if (gasUsed !== null && gasLimit !== null && gasLimit > 0n) {
-      // Convert safely (values are ~tens of millions, safe for Number)
       const usedN = Number(gasUsed);
       const limitN = Number(gasLimit);
       if (Number.isFinite(usedN) && Number.isFinite(limitN) && limitN > 0) {
@@ -154,7 +259,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 3) Tiers (simple multipliers)
+    // 3) Tiers
     const safe = round(gasGwei, 3);
     const fast = round(gasGwei * 1.15, 3);
     const rapid = round(gasGwei * 1.25, 3);
@@ -162,22 +267,30 @@ module.exports = async (req, res) => {
     // 4) ETH/USD (optional)
     const ethUsd = await fetchEthUsd();
 
-    // Caching: keep short (gas changes fast)
+    // 5) Featured Actions (NEW)
+    const featuredActions = buildFeaturedActions({
+      safeGwei: safe,
+      fastGwei: fast,
+      rapidGwei: rapid,
+      ethUsd,
+    });
+
     res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=30");
     res.setHeader("content-type", "application/json");
     res.statusCode = 200;
     res.end(
       JSON.stringify({
         chain: "base",
-        safe,   // number
-        fast,   // number
-        rapid,  // number
+        safe,
+        fast,
+        rapid,
         lastBlock,
-        gasUsedRatio, // number 0..1
-        gasUsedPct,   // string like "19.58"
-        ethUsd,       // number|null
+        gasUsedRatio,
+        gasUsedPct,
+        ethUsd,
+        featuredActions, // ✅ NEW
         source: "base-rpc",
-        rpcUrl,       // which RPC succeeded (debug)
+        rpcUrl,
       })
     );
   } catch (e) {
@@ -190,3 +303,4 @@ module.exports = async (req, res) => {
     );
   }
 };
+```0
