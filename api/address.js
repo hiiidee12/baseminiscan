@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   try {
     const address = (req.query.address || "").toString().trim();
 
-    // internal
+    // Tab selection logic
     const tabRaw = (req.query.tab || "tx").toString().trim().toLowerCase();
     const tab =
       tabRaw === "erc20" ? "erc20" :
@@ -13,10 +13,12 @@ export default async function handler(req, res) {
     const offset = Math.min(25, Math.max(1, parseInt(req.query.offset || "25", 10)));
     const wantCount = (req.query.count ?? "1").toString() !== "0";
 
+    // Validate Ethereum address format
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
       return res.status(400).json({ error: "Invalid address" });
     }
 
+    // API key pools
     const BALANCE_KEYS = [
       process.env.ETHERSCAN_API_KEY,
       process.env.ETHERSCAN_API_KEY_2,
@@ -38,7 +40,6 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY_12,
     ].filter(Boolean);
 
-    // INTERNAL TX KEYS
     const INTERNAL_KEYS = [
       process.env.ETHERSCAN_API_KEY_21,
       process.env.ETHERSCAN_API_KEY_22,
@@ -59,6 +60,7 @@ export default async function handler(req, res) {
 
     const API = "https://api.etherscan.io/v2/api";
 
+    // Utility functions
     const qs = (p) =>
       Object.entries(p)
         .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
@@ -89,6 +91,7 @@ export default async function handler(req, res) {
       throw last;
     };
 
+    // Fetch balance
     const balance = await tryWithPool(BALANCE_KEYS, async (apikey) => {
       const url = `${API}?${qs({
         chainid: 8453,
@@ -106,18 +109,18 @@ export default async function handler(req, res) {
       return json.result;
     });
 
-    // internal tx action
+    // Determine action and key pool based on tab
     const listAction =
       tab === "erc20" ? "tokentx" :
       tab === "internal" ? "txlistinternal" :
       "txlist";
 
-    // pool key
     const listPool =
       tab === "erc20" ? ERC20_KEYS :
       tab === "internal" ? (INTERNAL_KEYS.length ? INTERNAL_KEYS : TX_KEYS) :
       TX_KEYS;
 
+    // Fetch transaction list
     const list = await tryWithPool(listPool, async (apikey) => {
       const url = `${API}?${qs({
         chainid: 8453,
@@ -137,12 +140,11 @@ export default async function handler(req, res) {
       return Array.isArray(json.result) ? json.result : [];
     });
 
+    // Optional: fetch approximate transaction count
     let txCount = null;
-
     if (wantCount && COUNT_KEYS.length) {
       const PAGE = 1000;
-      const CAP = 200000;
-      const MAX = Math.ceil(CAP / PAGE);
+      const CAP = 1000;
 
       const pageLen = async (apikey, p) => {
         const url = `${API}?${qs({
@@ -166,31 +168,18 @@ export default async function handler(req, res) {
       try {
         txCount = await tryWithPool(COUNT_KEYS, async (apikey) => {
           const l1 = await pageLen(apikey, 1);
+
+          if (l1 === 0) return 0;
           if (l1 < PAGE) return l1;
 
-          let lo = 1,
-            hi = 2;
-          while (hi <= MAX && (await pageLen(apikey, hi)) > 0) {
-            lo = hi;
-            hi *= 2;
-          }
-          if (hi > MAX) return `${CAP}+`;
-
-          while (lo + 1 < hi) {
-            const mid = Math.floor((lo + hi) / 2);
-            if ((await pageLen(apikey, mid)) === 0) hi = mid;
-            else lo = mid;
-          }
-
-          const last = await pageLen(apikey, lo);
-          const total = (lo - 1) * PAGE + last;
-          return total >= CAP ? `${CAP}+` : total;
+          return "1K+";
         });
       } catch {
         txCount = null;
       }
     }
 
+    // Set caching headers and return response
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
 
     return res.status(200).json({
