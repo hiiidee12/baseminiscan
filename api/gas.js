@@ -20,6 +20,8 @@ function withTimeout(ms) {
 }
 
 function hexToBigInt(hex) {
+  if (!hex || typeof hex !== "string") return 0n;
+  // hex from RPC is like "0x12ab..."
   try {
     return BigInt(hex);
   } catch {
@@ -27,10 +29,12 @@ function hexToBigInt(hex) {
   }
 }
 
-function weiToGwei(wei) {
-  const n = Number(wei);
-  if (!Number.isFinite(n)) return null;
-  return n / 1e9;
+function weiToGwei(weiBig) {
+  // Keep as Number for UI; gasPrice on Base is small enough to safely fit Number.
+  const n = Number(weiBig);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const gwei = n / 1e9;
+  return Number.isFinite(gwei) ? gwei : null;
 }
 
 function round(n, d = 3) {
@@ -39,46 +43,55 @@ function round(n, d = 3) {
   return Math.round(n * p) / p;
 }
 
-function ratioToPctString(r, d = 2) {
-  if (!Number.isFinite(r)) return null;
-  return (r * 100).toFixed(d);
+function ratioToPctString(ratio01, digits = 2) {
+  if (!Number.isFinite(ratio01)) return null;
+  return (ratio01 * 100).toFixed(digits);
 }
 
 async function rpcCall(url, method, params = []) {
   const { signal, cancel } = withTimeout(RPC_TIMEOUT_MS);
   try {
-    const r = await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
       signal,
     });
-    const j = await r.json();
-    if (!r.ok || j?.error) throw new Error("RPC error");
-    return j.result;
+
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error(`RPC non-JSON response (${res.status})`);
+    }
+
+    if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
+    if (json?.error) throw new Error(json.error.message || "RPC error");
+    return json?.result;
   } finally {
     cancel();
   }
 }
 
 async function rpcTry(method, params = []) {
-  let last;
+  let lastErr = null;
   for (const url of RPC_URLS) {
     try {
-      return { url, result: await rpcCall(url, method, params) };
+      const result = await rpcCall(url, method, params);
+      return { url, result };
     } catch (e) {
-      last = e;
+      lastErr = e;
     }
   }
-  throw last;
+  throw lastErr || new Error("All RPC endpoints failed");
 }
 
-async function fetchJson(url, timeout) {
-  const { signal, cancel } = withTimeout(timeout);
+async function fetchJson(url, timeoutMs) {
+  const { signal, cancel } = withTimeout(timeoutMs);
   try {
-    const r = await fetch(url, { signal });
+    const r = await fetch(url, { headers: { accept: "application/json" }, signal });
     const j = await r.json();
-    return j;
+    return { ok: r.ok, json: j };
   } finally {
     cancel();
   }
@@ -87,76 +100,93 @@ async function fetchJson(url, timeout) {
 async function fetchEthUsd() {
   for (const u of PRICE_URLS) {
     try {
-      const j = await fetchJson(u, PRICE_TIMEOUT_MS);
-      if (j?.data?.amount) return Number(j.data.amount);
-      if (j?.ethereum?.usd) return Number(j.ethereum.usd);
+      const { ok, json } = await fetchJson(u, PRICE_TIMEOUT_MS);
+      if (!ok) continue;
+
+      const coinbase = Number(json?.data?.amount);
+      if (Number.isFinite(coinbase) && coinbase > 0) return coinbase;
+
+      const cg = Number(json?.ethereum?.usd);
+      if (Number.isFinite(cg) && cg > 0) return cg;
     } catch {}
   }
   return null;
 }
 
 module.exports = async (req, res) => {
+  // Only GET
   if (req.method !== "GET") {
-    res.status(405).json({ error: "Method not allowed" });
+    res.statusCode = 405;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ error: { message: "Method not allowed" } }));
     return;
   }
 
   try {
-    // Gas price
-    const { url: rpcUrl, result: gasHex } = await rpcTry("eth_gasPrice");
-    const gasGwei = weiToGwei(hexToBigInt(gasHex));
-    if (!gasGwei) throw new Error("Invalid gas");
+    // 1) Gas price
+    const { url: rpcUrl, result: gasPriceHex } = await rpcTry("eth_gasPrice");
+    const gasWei = hexToBigInt(gasPriceHex);
+    const gasGwei = weiToGwei(gasWei);
+    if (!Number.isFinite(gasGwei) || gasGwei <= 0) {
+      throw new Error(`Invalid gas price from RPC: ${String(gasPriceHex)}`);
+    }
 
-    // Block utilization
+    // 2) Latest block for utilization
     const { result: block } = await rpcTry("eth_getBlockByNumber", ["latest", false]);
 
-    const gasUsed = hexToBigInt(block.gasUsed);
-    const gasLimit = hexToBigInt(block.gasLimit);
-    const gasUsedRatio =
-      gasLimit > 0n ? Number(gasUsed) / Number(gasLimit) : null;
+    const lastBlock =
+      block?.number && typeof block.number === "string"
+        ? Number(hexToBigInt(block.number))
+        : null;
 
-    // Tiers
-    const safe = round(gasGwei);
-    const fast = round(gasGwei * 1.15);
-    const rapid = round(gasGwei * 1.25);
+    const gasUsed = block?.gasUsed ? hexToBigInt(block.gasUsed) : null;
+    const gasLimit = block?.gasLimit ? hexToBigInt(block.gasLimit) : null;
 
-    // Featured actions (FIXED)
+    let gasUsedRatio = null; // 0..1 (number)
+    let gasUsedPct = null;   // "19.58" (string) for easy UI
+    if (gasUsed !== null && gasLimit !== null && gasLimit > 0n) {
+      // Convert safely (values are ~tens of millions, safe for Number)
+      const usedN = Number(gasUsed);
+      const limitN = Number(gasLimit);
+      if (Number.isFinite(usedN) && Number.isFinite(limitN) && limitN > 0) {
+        gasUsedRatio = usedN / limitN;
+        gasUsedPct = ratioToPctString(gasUsedRatio, 2);
+      }
+    }
+
+    // 3) Tiers (simple multipliers)
+    const safe = round(gasGwei, 3);
+    const fast = round(gasGwei * 1.15, 3);
+    const rapid = round(gasGwei * 1.25, 3);
+
+    // 4) ETH/USD (optional)
     const ethUsd = await fetchEthUsd();
-    const gweiToUsd = ethUsd ? (gwei) => (gwei * 21000 * ethUsd) / 1e9 : null;
 
-    const featuredActions = ethUsd
-      ? {
-          erc20Transfer: {
-            low: `$${gweiToUsd(safe).toFixed(6)}`,
-            avg: `$${gweiToUsd(fast).toFixed(6)}`,
-            high: `$${gweiToUsd(rapid).toFixed(6)}`,
-          },
-          swap: {
-            low: `$${(gweiToUsd(safe) * 3).toFixed(3)}`,
-            avg: `$${(gweiToUsd(fast) * 3).toFixed(3)}`,
-            high: `$${(gweiToUsd(rapid) * 3).toFixed(3)}`,
-          },
-          addRemoveLP: {
-            low: `$${(gweiToUsd(safe) * 3).toFixed(3)}`,
-            avg: `$${(gweiToUsd(fast) * 3).toFixed(3)}`,
-            high: `$${(gweiToUsd(rapid) * 3).toFixed(3)}`,
-          },
-        }
-      : null;
-
+    // Caching: keep short (gas changes fast)
     res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=30");
-    res.status(200).json({
-      chain: "base",
-      safe,
-      fast,
-      rapid,
-      gasUsedPct: ratioToPctString(gasUsedRatio),
-      ethUsd,
-      featuredActions,
-      source: "base-rpc",
-      rpcUrl,
-    });
+    res.setHeader("content-type", "application/json");
+    res.statusCode = 200;
+    res.end(
+      JSON.stringify({
+        chain: "base",
+        safe,   // number
+        fast,   // number
+        rapid,  // number
+        lastBlock,
+        gasUsedRatio, // number 0..1
+        gasUsedPct,   // string like "19.58"
+        ethUsd,       // number|null
+        source: "base-rpc",
+        rpcUrl,       // which RPC succeeded (debug)
+      })
+    );
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.statusCode = 500;
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({
+        error: { message: e?.message || String(e) },
+      })
+    );
   }
 };
