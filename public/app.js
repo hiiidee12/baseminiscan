@@ -13,7 +13,7 @@ function shortHex(h, a = 6, b = 4) {
   return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
 }
 
-// ✅ DIPERBAIKI: HAPUS SPASI DI URL
+// ✅ DIPERBAIKI: HAPUS SPASI DI URL — sebelumnya ada spasi setelah path!
 function makeBaseScanUrl(q) {
   if (isTx(q)) return `https://basescan.org/tx/${q}`;
   if (isAddress(q)) return `https://basescan.org/address/${q}`;
@@ -55,8 +55,9 @@ function formatTokenAmount(raw, decimals, maxFrac = 6) {
     const v = BigInt(String(raw));
 
     let d = 0;
-    if (decimals === null || decimals === undefined || decimals === "") d = 0;
-    else d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0));
+    if (decimals !== null && decimals !== undefined && decimals !== "") {
+      d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0));
+    }
 
     if (d === 0) return v.toString();
 
@@ -143,9 +144,9 @@ function showPage(page) {
   const home = $("pageHome");
   const detail = $("pageDetail");
   if (!home || !detail) return;
-   
+
   document.body.setAttribute("data-page", page);
-   
+
   if (page === "detail") {
     home.style.display = "none";
     detail.style.display = "block";
@@ -160,13 +161,16 @@ function showPage(page) {
 ========================= */
 
 function setActiveDetailTab(tab) {
-  ["tabTx", "tabErc20", "tabInternal"].forEach((id) => {
+  ["tabTx", "tabErc20", "tabInternal", "tabNft"].forEach((id) => {
     const el = $(id);
     if (el) el.classList.add("secondary");
   });
 
   const active =
-    tab === "erc20" ? "tabErc20" : tab === "internal" ? "tabInternal" : "tabTx";
+    tab === "erc20" ? "tabErc20" :
+    tab === "internal" ? "tabInternal" :
+    tab === "nft" ? "tabNft" :
+    "tabTx";
 
   const el = $(active);
   if (el) el.classList.remove("secondary");
@@ -193,23 +197,17 @@ function tableSkeletonTx(rows = 6) {
       <div class="tableScroll">
         <table>
           <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Value</th>
-            </tr>
+            <tr><th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Value</th></tr>
           </thead>
           <tbody>
-            ${Array.from({ length: rows })
-              .map(
-                () => `
+            ${Array.from({ length: rows }).map(() => `
               <tr>
                 <td><div class="sk-line w70"></div><div class="sk-line w40"></div></td>
                 <td><div class="sk-line w40"></div></td>
                 <td><div class="sk-line w50"></div></td>
                 <td><div class="sk-line w50"></div></td>
                 <td><div class="sk-line w30"></div></td>
-              </tr>`
-              )
-              .join("")}
+              </tr>`).join("")}
           </tbody>
         </table>
       </div>
@@ -223,14 +221,10 @@ function tableSkeletonErc20(rows = 6) {
       <div class="tableScroll">
         <table>
           <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th>
-            </tr>
+            <tr><th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th></tr>
           </thead>
           <tbody>
-            ${Array.from({ length: rows })
-              .map(
-                () => `
+            ${Array.from({ length: rows }).map(() => `
               <tr>
                 <td><div class="sk-line w70"></div></td>
                 <td><div class="sk-line w40"></div></td>
@@ -238,9 +232,7 @@ function tableSkeletonErc20(rows = 6) {
                 <td><div class="sk-line w50"></div></td>
                 <td><div class="sk-line w50"></div></td>
                 <td><div class="sk-line w30"></div></td>
-              </tr>`
-              )
-              .join("")}
+              </tr>`).join("")}
           </tbody>
         </table>
       </div>
@@ -254,14 +246,10 @@ function tableSkeletonInternal(rows = 6) {
       <div class="tableScroll">
         <table>
           <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th>
-            </tr>
+            <tr><th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th></tr>
           </thead>
           <tbody>
-            ${Array.from({ length: rows })
-              .map(
-                () => `
+            ${Array.from({ length: rows }).map(() => `
               <tr>
                 <td><div class="sk-line w70"></div></td>
                 <td><div class="sk-line w40"></div></td>
@@ -269,9 +257,37 @@ function tableSkeletonInternal(rows = 6) {
                 <td><div class="sk-line w50"></div></td>
                 <td><div class="sk-line w30"></div></td>
                 <td><div class="sk-line w30"></div></td>
-              </tr>`
-              )
-              .join("")}
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function tableSkeletonNft(rows = 6) {
+  return `
+    <div class="tableWrap skeleton nft">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Tx</th><th>Age</th><th>Std</th>
+              <th>Collection</th><th>ID</th>
+              <th>From</th><th>To</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Array.from({ length: rows }).map(() => `
+              <tr>
+                <td><div class="sk-line w70"></div></td>
+                <td><div class="sk-line w40"></div></td>
+                <td><div class="sk-line w30"></div></td>
+                <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w30"></div></td>
+                <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w50"></div></td>
+              </tr>`).join("")}
           </tbody>
         </table>
       </div>
@@ -294,15 +310,10 @@ function ageFromTs(ts) {
 }
 
 function renderTxTable(list = []) {
-  const rows = list
-    .slice(0, 25)
-    .map(
-      (tx) => `
+  const rows = list.slice(0, 25).map(tx => `
     <tr>
       <td>
-        <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">
-          ${shortHex(tx.hash)}
-        </span>
+        <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">${shortHex(tx.hash)}</span>
         <div class="small">Block ${tx.blockNumber}</div>
       </td>
       <td class="small">${ageFromTs(tx.timeStamp)}</td>
@@ -310,22 +321,14 @@ function renderTxTable(list = []) {
       <td class="small">${shortHex(tx.to)}</td>
       <td>${weiToEthStr(tx.value) ?? "0.000000"} ETH</td>
     </tr>
-  `
-    )
-    .join("");
+  `).join("");
 
   return `
     <div class="tableWrap">
       <div class="tableScroll">
         <table>
-          <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="5">No transactions</td></tr>`}
-          </tbody>
+          <thead><tr><th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Value</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="5">No transactions</td></tr>`}</tbody>
         </table>
       </div>
     </div>
@@ -333,84 +336,65 @@ function renderTxTable(list = []) {
 }
 
 function renderErc20Table(list = []) {
-  const rows = list
-    .slice(0, 25)
-    .map((t) => {
-      const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? 0;
-      const human = formatTokenAmount(t.value, dec, 6);
-      const show = compactNumberString(human);
+  const rows = list.slice(0, 25).map(t => {
+    const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? 0;
+    const human = formatTokenAmount(t.value, dec, 6);
+    const show = compactNumberString(human);
 
-      return `
-        <tr>
-          <td>
-            <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
-            <div class="small">${t.tokenName ? String(t.tokenName).slice(0, 32) : ""}</div>
-          </td>
-          <td class="small">${ageFromTs(t.timeStamp)}</td>
-          <td>${t.tokenSymbol || "-"}</td>
-          <td class="small">${shortHex(t.from)}</td>
-          <td class="small">${shortHex(t.to)}</td>
-          <td title="${human}">${show}</td>
-        </tr>
-      `;
-    })
-    .join("");
+    return `
+      <tr>
+        <td>
+          <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
+          <div class="small">${t.tokenName ? String(t.tokenName).slice(0, 32) : ""}</div>
+        </td>
+        <td class="small">${ageFromTs(t.timeStamp)}</td>
+        <td>${t.tokenSymbol || "-"}</td>
+        <td class="small">${shortHex(t.from)}</td>
+        <td class="small">${shortHex(t.to)}</td>
+        <td title="${human}">${show}</td>
+      </tr>
+    `;
+  }).join("");
 
   return `
     <div class="tableWrap">
       <div class="tableScroll">
         <table>
-          <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="6">No transfers</td></tr>`}
-          </tbody>
+          <thead><tr><th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="6">No transfers</td></tr>`}</tbody>
         </table>
       </div>
     </div>
   `;
 }
 
-// ✅ DIPERBAIKI: TAMBAHKAN CLASS "internal"
 function renderInternalTable(list = []) {
-  const rows = list
-    .slice(0, 25)
-    .map((t) => {
-      const hash = t.hash || t.transactionHash || "-";
-      const typ = (t.type || t.callType || "-").toString();
-      const val = weiToEthStr(t.value) ?? "0.000000"; // typo fix below
+  const rows = list.slice(0, 25).map(t => {
+    const hash = t.hash || t.transactionHash || "-";
+    const typ = (t.type || t.callType || "-").toString();
+    const val = weiToEthStr(t.value) ?? "0.000000";
 
-      return `
-        <tr>
-          <td>
-            <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
-            <div class="small">Block ${t.blockNumber ?? "-"}</div>
-          </td>
-          <td class="small">${ageFromTs(t.timeStamp)}</td>
-          <td class="small">${shortHex(t.from)}</td>
-          <td class="small">${shortHex(t.to)}</td>
-          <td class="small">${typ}</td>
-          <td>${val} ETH</td>
-        </tr>
-      `;
-    })
-    .join("");
+    return `
+      <tr>
+        <td>
+          <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
+          <div class="small">Block ${t.blockNumber ?? "-"}</div>
+        </td>
+        <td class="small">${ageFromTs(t.timeStamp)}</td>
+        <td class="small">${shortHex(t.from)}</td>
+        <td class="small">${shortHex(t.to)}</td>
+        <td class="small">${typ}</td>
+        <td>${val} ETH</td>
+      </tr>
+    `;
+  }).join("");
 
   return `
     <div class="tableWrap internal">
       <div class="tableScroll">
         <table>
-          <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="6">No internal calls</td></tr>`}
-          </tbody>
+          <thead><tr><th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="6">No internal calls</td></tr>`}</tbody>
         </table>
       </div>
     </div>
@@ -418,17 +402,15 @@ function renderInternalTable(list = []) {
 }
 
 function renderNftTable(list = []) {
-  const rows = list.map((t) => `
+  const rows = list.map(t => `
     <tr>
       <td>
-        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">
-          ${shortHex(t.hash)}
-        </span>
+        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
       </td>
       <td class="small">${ageFromTs(t.timeStamp)}</td>
-      <td class="small">${t.nftStd}</td>
+      <td class="small">${t.nftStd || "-"}</td>
       <td>${t.tokenName || "-"}</td>
-      <td class="small">#${t.tokenID}</td>
+      <td class="small">#${t.tokenID || "?"}</td>
       <td class="small">${shortHex(t.from)}</td>
       <td class="small">${shortHex(t.to)}</td>
     </tr>
@@ -445,9 +427,7 @@ function renderNftTable(list = []) {
               <th>From</th><th>To</th>
             </tr>
           </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="7">No NFT transfers</td></tr>`}
-          </tbody>
+          <tbody>${rows || `<tr><td colspan="7">No NFT transfers</td></tr>`}</tbody>
         </table>
       </div>
     </div>
@@ -475,6 +455,7 @@ function normalizeDetailTab(tab) {
   if (t === "nft") return "nft";
   return "tx";
 }
+
 async function loadDetail(address, tab = "tx") {
   tab = normalizeDetailTab(tab);
   __detailAddress = address;
@@ -491,11 +472,10 @@ async function loadDetail(address, tab = "tx") {
   const out = $("detailOutput");
   if (out) {
     const sk =
-      tab === "erc20"
-        ? tableSkeletonErc20()
-        : tab === "internal"
-          ? tableSkeletonInternal()
-          : tableSkeletonTx();
+      tab === "erc20" ? tableSkeletonErc20() :
+      tab === "internal" ? tableSkeletonInternal() :
+      tab === "nft" ? tableSkeletonNft() :
+      tableSkeletonTx();
     out.innerHTML = overviewSkeleton() + sk;
   }
 
@@ -515,20 +495,13 @@ async function loadDetail(address, tab = "tx") {
     applyOverviewFromState();
 
     if (out) {
-      // ✅ Perbaiki typo: "weiToThStr" → "weiToEthStr"
-      const originalRender = renderInternalTable;
-      // Tapi kita sudah perbaiki di atas
-
       out.innerHTML =
-  tab === "erc20"
-    ? renderErc20Table(j.list)
-    : tab === "internal"
-      ? renderInternalTable(j.list)
-      : tab === "nft"
-        ? renderNftTable(j.list)
-        : renderTxTable(j.list);
+        tab === "erc20" ? renderErc20Table(j.list) :
+        tab === "internal" ? renderInternalTable(j.list) :
+        tab === "nft" ? renderNftTable(j.list) :
+        renderTxTable(j.list);
 
-      out.querySelectorAll("[data-open]").forEach((el) => {
+      out.querySelectorAll("[data-open]").forEach(el => {
         el.onclick = () => openExternal(el.dataset.open);
       });
     }
@@ -565,17 +538,13 @@ function formatGwei(v) {
 function renderGasSkeleton() {
   return `
     <div class="gasGrid">
-      ${Array.from({ length: 3 })
-        .map(
-          () => `
+      ${Array.from({ length: 3 }).map(() => `
         <div class="gasCard skeleton">
           <div class="sk-line w30"></div>
           <div class="sk-line w50"></div>
           <div class="sk-line w40"></div>
         </div>
-      `
-        )
-        .join("")}
+      `).join("")}
       <div class="resultCard skeleton">
         <div class="sk-line w40"></div>
         <div class="sk-line w60"></div>
@@ -597,7 +566,6 @@ function renderGas(data) {
   const safe = formatGwei(safeRaw);
   const fast = formatGwei(fastRaw);
   const rapid = formatGwei(rapidRaw);
-
   const lastBlock = data?.lastBlock ?? "—";
 
   let util = "—";
@@ -616,19 +584,16 @@ function renderGas(data) {
         <div class="gasValue">${safe} <span class="unit">Gwei</span></div>
         <div class="muted">~ 12–16 secs</div>
       </div>
-
       <div class="gasCard">
         <div class="gasLabel">😄 Fast</div>
         <div class="gasValue">${fast} <span class="unit">Gwei</span></div>
         <div class="muted">~ 6–8 secs</div>
       </div>
-
       <div class="gasCard">
         <div class="gasLabel">🚀 Rapid</div>
         <div class="gasValue">${rapid} <span class="unit">Gwei</span></div>
         <div class="muted">~ 2–3 secs</div>
       </div>
-
       <div class="resultCard">
         <div style="font-weight:800; font-size:16px;">Additional Info</div>
         <div class="small muted" style="margin-top:10px;">
@@ -721,7 +686,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   $("back")?.addEventListener("click", () => {
-    setHash(`/`);
+    setHash("/");
   });
 
   $("tabTx")?.addEventListener("click", () => {
@@ -735,10 +700,10 @@ window.addEventListener("DOMContentLoaded", () => {
   $("tabInternal")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "internal");
   });
-   
+
   $("tabNft")?.addEventListener("click", () => {
-  if (__detailAddress) loadDetail(__detailAddress, "nft");
-});
-   
+    if (__detailAddress) loadDetail(__detailAddress, "nft");
+  });
+
   handleRoute();
 });
