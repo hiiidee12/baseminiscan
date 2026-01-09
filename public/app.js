@@ -417,6 +417,43 @@ function renderInternalTable(list = []) {
   `;
 }
 
+function renderNftTable(list = []) {
+  const rows = list.map((t) => `
+    <tr>
+      <td>
+        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">
+          ${shortHex(t.hash)}
+        </span>
+      </td>
+      <td class="small">${ageFromTs(t.timeStamp)}</td>
+      <td class="small">${t.nftStd}</td>
+      <td>${t.tokenName || "-"}</td>
+      <td class="small">#${t.tokenID}</td>
+      <td class="small">${shortHex(t.from)}</td>
+      <td class="small">${shortHex(t.to)}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <div class="tableWrap nft">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Tx</th><th>Age</th><th>Std</th>
+              <th>Collection</th><th>ID</th>
+              <th>From</th><th>To</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="7">No NFT transfers</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 /* =========================
    Detail Loader
 ========================= */
@@ -435,9 +472,9 @@ function normalizeDetailTab(tab) {
   const t = String(tab || "").toLowerCase();
   if (t === "erc20") return "erc20";
   if (t === "internal") return "internal";
+  if (t === "nft") return "nft";
   return "tx";
 }
-
 async function loadDetail(address, tab = "tx") {
   tab = normalizeDetailTab(tab);
   __detailAddress = address;
@@ -483,11 +520,13 @@ async function loadDetail(address, tab = "tx") {
       // Tapi kita sudah perbaiki di atas
 
       out.innerHTML =
-        tab === "erc20"
-          ? renderErc20Table(j.list)
-          : tab === "internal"
-            ? renderInternalTable(j.list)
-            : renderTxTable(j.list);
+  tab === "erc20"
+    ? renderErc20Table(j.list)
+    : tab === "internal"
+      ? renderInternalTable(j.list)
+      : tab === "nft"
+        ? renderNftTable(j.list)
+        : renderTxTable(j.list);
 
       out.querySelectorAll("[data-open]").forEach((el) => {
         el.onclick = () => openExternal(el.dataset.open);
@@ -696,6 +735,10 @@ window.addEventListener("DOMContentLoaded", () => {
   $("tabInternal")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "internal");
   });
-
+   
+  $("tabNft")?.addEventListener("click", () => {
+  if (__detailAddress) loadDetail(__detailAddress, "nft");
+});
+   
   handleRoute();
 });
