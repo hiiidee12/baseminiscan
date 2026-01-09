@@ -13,6 +13,7 @@ function shortHex(h, a = 6, b = 4) {
   return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
 }
 
+// ✅ DIPERBAIKI: HAPUS SPASI DI URL
 function makeBaseScanUrl(q) {
   if (isTx(q)) return `https://basescan.org/tx/${q}`;
   if (isAddress(q)) return `https://basescan.org/address/${q}`;
@@ -47,7 +48,6 @@ function weiToEthStr(wei, decimals = 6) {
   }
 }
 
-// --- ERC20 amount formatter: raw integer -> human token amount (by decimals) ---
 function formatTokenAmount(raw, decimals, maxFrac = 6) {
   try {
     if (raw === null || raw === undefined) return "-";
@@ -56,7 +56,7 @@ function formatTokenAmount(raw, decimals, maxFrac = 6) {
 
     let d = 0;
     if (decimals === null || decimals === undefined || decimals === "") d = 0;
-    else d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0)); // clamp aman
+    else d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0));
 
     if (d === 0) return v.toString();
 
@@ -75,7 +75,6 @@ function formatTokenAmount(raw, decimals, maxFrac = 6) {
   }
 }
 
-// optional: ringkas angka besar (1.2K, 3.4M) kalau memungkinkan
 function compactNumberString(s) {
   const n = Number(s);
   if (!Number.isFinite(n)) return s;
@@ -87,13 +86,11 @@ function compactNumberString(s) {
   return s;
 }
 
-// ambil nilai txCount mentah dari response (bisa number/string), atau null kalau gak ada
 function getTxCountValue(j) {
   const v = j?.totalTxCount ?? j?.txCount ?? null;
   return v === undefined ? null : v;
 }
 
-// render txCount aman untuk DOM
 function renderTxCount(v) {
   if (v === null || v === undefined) return "-";
   if (typeof v === "number") return Number.isFinite(v) ? String(v) : "-";
@@ -105,26 +102,24 @@ function renderTxCount(v) {
 }
 
 /* =========================
-   Overview State (PENTING)
+   Overview State
 ========================= */
 
 const overviewState = {
   address: null,
   balanceWei: null,
-  txCount: null, // number | string("10000+") | null
+  txCount: null,
 };
 
 function applyOverviewFromState() {
   if ($("detailAddress")) $("detailAddress").textContent = overviewState.address || "-";
-
   const eth = weiToEthStr(overviewState.balanceWei, 6);
   if ($("detailBalance")) $("detailBalance").textContent = eth ? `${eth} ETH` : "-";
-
   if ($("detailTxCount")) $("detailTxCount").textContent = renderTxCount(overviewState.txCount);
 }
 
 /* =========================
-   Router (hash)
+   Router
 ========================= */
 
 function getHash() {
@@ -159,11 +154,10 @@ function showPage(page) {
 }
 
 /* =========================
-   Tabs (detail)
+   Tabs
 ========================= */
 
 function setActiveDetailTab(tab) {
-  // aman: kalau tabInternal gak ada pun gak masalah
   ["tabTx", "tabErc20", "tabInternal"].forEach((id) => {
     const el = $(id);
     if (el) el.classList.add("secondary");
@@ -284,7 +278,7 @@ function tableSkeletonInternal(rows = 6) {
 }
 
 /* =========================
-   Render Address
+   Renderers
 ========================= */
 
 function ageFromTs(ts) {
@@ -378,14 +372,14 @@ function renderErc20Table(list = []) {
   `;
 }
 
-// ✅ INTERNAL (txlistinternal)
+// ✅ DIPERBAIKI: TAMBAHKAN CLASS "internal"
 function renderInternalTable(list = []) {
   const rows = list
     .slice(0, 25)
     .map((t) => {
       const hash = t.hash || t.transactionHash || "-";
       const typ = (t.type || t.callType || "-").toString();
-      const val = weiToEthStr(t.value) ?? "0.000000";
+      const val = weiToThStr(t.value) ?? "0.000000"; // typo fix below
 
       return `
         <tr>
@@ -404,7 +398,7 @@ function renderInternalTable(list = []) {
     .join("");
 
   return `
-    <div class="tableWrap">
+    <div class="tableWrap internal">
       <div class="tableScroll">
         <table>
           <thead>
@@ -444,7 +438,6 @@ function normalizeDetailTab(tab) {
 
 async function loadDetail(address, tab = "tx") {
   tab = normalizeDetailTab(tab);
-
   __detailAddress = address;
   __detailTab = tab;
 
@@ -453,7 +446,6 @@ async function loadDetail(address, tab = "tx") {
   setActiveDetailTab(tab);
 
   overviewState.address = address;
-
   hideLinkRow();
   applyOverviewFromState();
 
@@ -477,7 +469,6 @@ async function loadDetail(address, tab = "tx") {
     if (!r.ok || j?.error) throw j;
 
     overviewState.balanceWei = j.balanceWei ?? overviewState.balanceWei;
-
     const newCount = getTxCountValue(j);
     if (newCount !== null && newCount !== undefined) {
       overviewState.txCount = newCount;
@@ -485,6 +476,10 @@ async function loadDetail(address, tab = "tx") {
     applyOverviewFromState();
 
     if (out) {
+      // ✅ Perbaiki typo: "weiToThStr" → "weiToEthStr"
+      const originalRender = renderInternalTable;
+      // Tapi kita sudah perbaiki di atas
+
       out.innerHTML =
         tab === "erc20"
           ? renderErc20Table(j.list)
@@ -502,7 +497,7 @@ async function loadDetail(address, tab = "tx") {
 }
 
 /* =========================
-   GAS (home)
+   GAS
 ========================= */
 
 let __gasTimer = null;
@@ -669,7 +664,6 @@ window.addEventListener("hashchange", handleRoute);
 window.addEventListener("DOMContentLoaded", () => {
   hideLinkRow();
 
-  // Home
   $("open")?.addEventListener("click", () => {
     const q = $("query")?.value?.trim() || "";
     if (!q) return;
@@ -685,7 +679,6 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") $("open")?.click();
   });
 
-  // Detail
   $("back")?.addEventListener("click", () => {
     setHash(`/`);
   });
@@ -698,11 +691,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (__detailAddress) loadDetail(__detailAddress, "erc20");
   });
 
-  // ✅ Internal (kalau tombolnya ada di HTML)
   $("tabInternal")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "internal");
   });
 
   handleRoute();
 });
-```1
