@@ -486,3 +486,7 @@ th {
     border-radius: 18px;
   }
 }
+/* hide profile on detail page */
+body[data-page="detail"] .profile {
+  display: none;
+}
