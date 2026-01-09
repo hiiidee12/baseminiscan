@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     const tab =
       tabRaw === "erc20" ? "erc20" :
       tabRaw === "internal" ? "internal" :
+      tabRaw === "nft" ? "nft" :
       "tx";
 
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
@@ -45,6 +46,13 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY_22,
       process.env.ETHERSCAN_API_KEY_23,
       process.env.ETHERSCAN_API_KEY_24,
+    ].filter(Boolean);
+
+    const NFT_KEYS = [
+      process.env.ETHERSCAN_API_KEY_25,
+      process.env.ETHERSCAN_API_KEY_26,
+      process.env.ETHERSCAN_API_KEY_27,
+      process.env.ETHERSCAN_API_KEY_28,
     ].filter(Boolean);
 
     const COUNT_KEYS = [
@@ -108,7 +116,59 @@ export default async function handler(req, res) {
       }
       return json.result;
     });
+      if (tab === "nft") {
+  if (!NFT_KEYS.length) {
+    return res.status(200).json({
+      address,
+      chain: "base",
+      tab,
+      balanceWei: balance,
+      list: [],
+    });
+  }
 
+  const take = Math.min(200, page * offset);
+
+  const fetchNFT = async (action, apikey) => {
+    const url = `${API}?${qs({
+      chainid: 8453,
+      module: "account",
+      action,
+      address,
+      page: 1,
+      offset: take,
+      sort: "desc",
+      apikey,
+    })}`;
+    const { json } = await fetchJson(url);
+    return Array.isArray(json.result) ? json.result : [];
+  };
+
+  const list = await tryWithPool(NFT_KEYS, async (apikey) => {
+    const [n721, n1155] = await Promise.all([
+      fetchNFT("tokennfttx", apikey),
+      fetchNFT("token1155tx", apikey),
+    ]);
+
+    const merged = [
+      ...n721.map((x) => ({ ...x, nftStd: "ERC-721" })),
+      ...n1155.map((x) => ({ ...x, nftStd: "ERC-1155" })),
+    ];
+
+    merged.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
+
+    const start = (page - 1) * offset;
+    return merged.slice(start, start + offset);
+  });
+
+  return res.status(200).json({
+    address,
+    chain: "base",
+    tab,
+    balanceWei: balance,
+    list,
+  });
+}
     // Determine action and key pool based on tab
     const listAction =
       tab === "erc20" ? "tokentx" :
