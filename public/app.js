@@ -52,12 +52,11 @@ function formatTokenAmount(raw, decimals, maxFrac = 6) {
   try {
     if (raw === null || raw === undefined) return "-";
 
-    // Etherscan biasanya string angka besar
     const v = BigInt(String(raw));
 
     let d = 0;
     if (decimals === null || decimals === undefined || decimals === "") d = 0;
-    else d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0)); // clamp biar aman
+    else d = Math.max(0, Math.min(36, parseInt(String(decimals), 10) || 0)); // clamp aman
 
     if (d === 0) return v.toString();
 
@@ -65,20 +64,19 @@ function formatTokenAmount(raw, decimals, maxFrac = 6) {
     const whole = v / base;
     const frac = v % base;
 
-    // ambil maxFrac digit pecahan, trim nol
     const fracStrFull = frac.toString().padStart(d, "0");
-    const fracStr = fracStrFull.slice(0, Math.min(maxFrac, d)).replace(/0+$/, "");
+    const fracStr = fracStrFull
+      .slice(0, Math.min(maxFrac, d))
+      .replace(/0+$/, "");
 
     return fracStr ? `${whole.toString()}.${fracStr}` : whole.toString();
   } catch {
-    // fallback aman
     return String(raw);
   }
 }
 
-// optional: ringkas angka besar (1.2K, 3.4M) tapi tetap aman
+// optional: ringkas angka besar (1.2K, 3.4M) kalau memungkinkan
 function compactNumberString(s) {
-  // hanya kalau bisa jadi Number kecil-menengah
   const n = Number(s);
   if (!Number.isFinite(n)) return s;
   const abs = Math.abs(n);
@@ -86,7 +84,7 @@ function compactNumberString(s) {
   if (abs < 1e6) return `${(n / 1e3).toFixed(2).replace(/\.?0+$/, "")}K`;
   if (abs < 1e9) return `${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`;
   if (abs < 1e12) return `${(n / 1e9).toFixed(2).replace(/\.?0+$/, "")}B`;
-  return s; // biarin kalau super besar
+  return s;
 }
 
 // ambil nilai txCount mentah dari response (bisa number/string), atau null kalau gak ada
@@ -165,11 +163,15 @@ function showPage(page) {
 ========================= */
 
 function setActiveDetailTab(tab) {
-  ["tabTx", "tabErc20"].forEach((id) => {
+  // aman: kalau tabInternal gak ada pun gak masalah
+  ["tabTx", "tabErc20", "tabInternal"].forEach((id) => {
     const el = $(id);
     if (el) el.classList.add("secondary");
   });
-  const active = tab === "erc20" ? "tabErc20" : "tabTx";
+
+  const active =
+    tab === "erc20" ? "tabErc20" : tab === "internal" ? "tabInternal" : "tabTx";
+
   const el = $(active);
   if (el) el.classList.remove("secondary");
 }
@@ -189,7 +191,7 @@ function overviewSkeleton() {
   `;
 }
 
-function tableSkeleton(rows = 6) {
+function tableSkeletonTx(rows = 6) {
   return `
     <div class="tableWrap skeleton">
       <div class="tableScroll">
@@ -208,6 +210,68 @@ function tableSkeleton(rows = 6) {
                 <td><div class="sk-line w40"></div></td>
                 <td><div class="sk-line w50"></div></td>
                 <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w30"></div></td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function tableSkeletonErc20(rows = 6) {
+  return `
+    <div class="tableWrap skeleton">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Array.from({ length: rows })
+              .map(
+                () => `
+              <tr>
+                <td><div class="sk-line w70"></div></td>
+                <td><div class="sk-line w40"></div></td>
+                <td><div class="sk-line w40"></div></td>
+                <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w30"></div></td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function tableSkeletonInternal(rows = 6) {
+  return `
+    <div class="tableWrap skeleton">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Array.from({ length: rows })
+              .map(
+                () => `
+              <tr>
+                <td><div class="sk-line w70"></div></td>
+                <td><div class="sk-line w40"></div></td>
+                <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w50"></div></td>
+                <td><div class="sk-line w30"></div></td>
                 <td><div class="sk-line w30"></div></td>
               </tr>`
               )
@@ -314,6 +378,49 @@ function renderErc20Table(list = []) {
   `;
 }
 
+// ✅ INTERNAL (txlistinternal)
+function renderInternalTable(list = []) {
+  const rows = list
+    .slice(0, 25)
+    .map((t) => {
+      const hash = t.hash || t.transactionHash || "-";
+      const typ = (t.type || t.callType || "-").toString();
+      const val = weiToEthStr(t.value) ?? "0.000000";
+
+      return `
+        <tr>
+          <td>
+            <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
+            <div class="small">Block ${t.blockNumber ?? "-"}</div>
+          </td>
+          <td class="small">${ageFromTs(t.timeStamp)}</td>
+          <td class="small">${shortHex(t.from)}</td>
+          <td class="small">${shortHex(t.to)}</td>
+          <td class="small">${typ}</td>
+          <td>${val} ETH</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="tableWrap">
+      <div class="tableScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="6">No internal calls</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 /* =========================
    Detail Loader
 ========================= */
@@ -328,7 +435,16 @@ function hideLinkRow() {
   link.style.display = "none";
 }
 
+function normalizeDetailTab(tab) {
+  const t = String(tab || "").toLowerCase();
+  if (t === "erc20") return "erc20";
+  if (t === "internal") return "internal";
+  return "tx";
+}
+
 async function loadDetail(address, tab = "tx") {
+  tab = normalizeDetailTab(tab);
+
   __detailAddress = address;
   __detailTab = tab;
 
@@ -342,7 +458,15 @@ async function loadDetail(address, tab = "tx") {
   applyOverviewFromState();
 
   const out = $("detailOutput");
-  if (out) out.innerHTML = overviewSkeleton() + tableSkeleton();
+  if (out) {
+    const sk =
+      tab === "erc20"
+        ? tableSkeletonErc20()
+        : tab === "internal"
+          ? tableSkeletonInternal()
+          : tableSkeletonTx();
+    out.innerHTML = overviewSkeleton() + sk;
+  }
 
   try {
     const r = await fetch(
@@ -361,7 +485,12 @@ async function loadDetail(address, tab = "tx") {
     applyOverviewFromState();
 
     if (out) {
-      out.innerHTML = tab === "erc20" ? renderErc20Table(j.list) : renderTxTable(j.list);
+      out.innerHTML =
+        tab === "erc20"
+          ? renderErc20Table(j.list)
+          : tab === "internal"
+            ? renderInternalTable(j.list)
+            : renderTxTable(j.list);
 
       out.querySelectorAll("[data-open]").forEach((el) => {
         el.onclick = () => openExternal(el.dataset.open);
@@ -569,5 +698,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (__detailAddress) loadDetail(__detailAddress, "erc20");
   });
 
+  // ✅ Internal (kalau tombolnya ada di HTML)
+  $("tabInternal")?.addEventListener("click", () => {
+    if (__detailAddress) loadDetail(__detailAddress, "internal");
+  });
+
   handleRoute();
 });
+```1
