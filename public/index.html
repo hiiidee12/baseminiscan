@@ -23,7 +23,7 @@
   <div class="wrap" id="wrap">
     <div class="card">
 
-      <!-- Profile header (tetap sama) -->
+      <!-- Profile header -->
       <div class="profile">
         <img id="pfp" class="pfp" alt="pfp" />
         <div class="profileInfo">
@@ -62,12 +62,9 @@
 
       <!-- ============= DETAIL PAGE ============= -->
       <section id="pageDetail" data-page="detail" style="display:none">
-        <!-- Floating top bar (Back di atas profil) -->
+        <!-- Floating top bar -->
         <div class="detailTop">
           <button id="back" class="secondary backBtn">← Back</button>
-
-          <!-- elemen ini disisakan biar app.js kamu tidak error,
-               tapi akan disembunyikan lewat CSS -->
           <div class="muted" id="link"></div>
         </div>
 
@@ -90,8 +87,6 @@
         <div class="tabs">
           <button id="tabTx" class="secondary">Transactions</button>
           <button id="tabErc20" class="secondary">ERC-20 Transfers</button>
-
-          <!-- Internal -->
           <button id="tabInternal" class="secondary">Internal</button>
         </div>
 
