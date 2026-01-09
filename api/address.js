@@ -19,6 +19,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid address" });
     }
 
+    // CDN caches full URL incl. query
+    const cacheByTab = {
+      tx: "s-maxage=30, stale-while-revalidate=120",
+      erc20: "s-maxage=30, stale-while-revalidate=180",
+      internal: "s-maxage=60, stale-while-revalidate=300",
+      nft: "s-maxage=120, stale-while-revalidate=900",
+    };
+    res.setHeader("Cache-Control", cacheByTab[tab] || cacheByTab.tx);
+    res.setHeader("Vary", "Accept-Encoding");
+
     // API key pools
     const BALANCE_KEYS = [
       process.env.ETHERSCAN_API_KEY,
@@ -76,28 +86,56 @@ export default async function handler(req, res) {
 
     const isOkOrEmpty = (j) => j?.status === "1" || j?.message === "No transactions found";
 
-    const isRateLimited = (j) => {
-      const m = (j?.result || j?.message || "").toString().toLowerCase();
-      return m.includes("rate limit") || m.includes("max rate") || m.includes("too many");
+    const isRateLimited = (j, httpStatus) => {
+      if (httpStatus === 429) return true;
+      const m = (j?.result || j?.message || j?.error || "").toString().toLowerCase();
+      return (
+        m.includes("rate limit") ||
+        m.includes("max rate") ||
+        m.includes("too many") ||
+        m.includes("throttle") ||
+        m.includes("throttled") ||
+        m.includes("busy") ||
+        m.includes("temporarily")
+      );
     };
 
-    const fetchJson = async (url) => {
-      const r = await fetch(url);
-      const j = await r.json().catch(() => ({}));
-      return { json: j };
+    const fetchJson = async (url, { timeoutMs = 10_000 } = {}) => {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), timeoutMs);
+      try {
+        const r = await fetch(url, { signal: ctl.signal });
+        const text = await r.text();
+        let json = {};
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = { message: text?.slice(0, 200) || "" };
+        }
+        return { json, httpStatus: r.status, ok: r.ok };
+      } finally {
+        clearTimeout(t);
+      }
     };
 
-    const tryWithPool = async (pool, fn) => {
-      let last;
-      for (const k of pool) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    const tryWithPool = async (pool, fn, { retryDelayMs = 250 } = {}) => {
+      if (!pool || pool.length === 0) throw new Error("NO_API_KEYS");
+      let lastErr;
+      for (let i = 0; i < pool.length; i++) {
+        const k = pool[i];
         try {
           return await fn(k);
         } catch (e) {
-          last = e;
+          lastErr = e;
+          await sleep(retryDelayMs + Math.floor(Math.random() * 200));
         }
       }
-      throw last;
+      throw lastErr || new Error("ALL_KEYS_FAILED");
     };
+
+    const isTransientHttp = (s) => [502, 503, 504].includes(s);
 
     // Fetch balance
     const balance = await tryWithPool(BALANCE_KEYS, async (apikey) => {
@@ -109,66 +147,84 @@ export default async function handler(req, res) {
         tag: "latest",
         apikey,
       })}`;
-      const { json } = await fetchJson(url);
-      if (json?.status !== "1") {
-        if (isRateLimited(json)) throw new Error();
-        throw new Error();
+
+      const { json, httpStatus, ok } = await fetchJson(url);
+
+      if (!ok || json?.status !== "1") {
+        // rotate key only for throttling/transient
+        if (isRateLimited(json, httpStatus) || isTransientHttp(httpStatus)) {
+          throw new Error("RETRY_KEY");
+        }
+        throw new Error(json?.message || "BALANCE_FAILED");
       }
+
       return json.result;
     });
-      if (tab === "nft") {
-  if (!NFT_KEYS.length) {
-    return res.status(200).json({
-      address,
-      chain: "base",
-      tab,
-      balanceWei: balance,
-      list: [],
-    });
-  }
 
-  const take = Math.min(200, page * offset);
+    // NFT tab
+    if (tab === "nft") {
+      if (!NFT_KEYS.length) {
+        return res.status(200).json({
+          address,
+          chain: "base",
+          tab,
+          balanceWei: balance,
+          list: [],
+        });
+      }
 
-  const fetchNFT = async (action, apikey) => {
-    const url = `${API}?${qs({
-      chainid: 8453,
-      module: "account",
-      action,
-      address,
-      page: 1,
-      offset: take,
-      sort: "desc",
-      apikey,
-    })}`;
-    const { json } = await fetchJson(url);
-    return Array.isArray(json.result) ? json.result : [];
-  };
+      const take = Math.min(200, page * offset);
 
-  const list = await tryWithPool(NFT_KEYS, async (apikey) => {
-    const [n721, n1155] = await Promise.all([
-      fetchNFT("tokennfttx", apikey),
-      fetchNFT("token1155tx", apikey),
-    ]);
+      const fetchNFT = async (action, apikey) => {
+        const url = `${API}?${qs({
+          chainid: 8453,
+          module: "account",
+          action,
+          address,
+          page: 1,
+          offset: take,
+          sort: "desc",
+          apikey,
+        })}`;
 
-    const merged = [
-      ...n721.map((x) => ({ ...x, nftStd: "ERC-721" })),
-      ...n1155.map((x) => ({ ...x, nftStd: "ERC-1155" })),
-    ];
+        const { json, httpStatus, ok } = await fetchJson(url);
 
-    merged.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
+        if (!ok || !isOkOrEmpty(json)) {
+          if (isRateLimited(json, httpStatus) || isTransientHttp(httpStatus)) {
+            throw new Error("RETRY_KEY");
+          }
+          throw new Error(json?.message || "NFT_FAILED");
+        }
 
-    const start = (page - 1) * offset;
-    return merged.slice(start, start + offset);
-  });
+        return Array.isArray(json.result) ? json.result : [];
+      };
 
-  return res.status(200).json({
-    address,
-    chain: "base",
-    tab,
-    balanceWei: balance,
-    list,
-  });
-}
+      const list = await tryWithPool(NFT_KEYS, async (apikey) => {
+        const [n721, n1155] = await Promise.all([
+          fetchNFT("tokennfttx", apikey),
+          fetchNFT("token1155tx", apikey),
+        ]);
+
+        const merged = [
+          ...n721.map((x) => ({ ...x, nftStd: "ERC-721" })),
+          ...n1155.map((x) => ({ ...x, nftStd: "ERC-1155" })),
+        ];
+
+        merged.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
+
+        const start = (page - 1) * offset;
+        return merged.slice(start, start + offset);
+      });
+
+      return res.status(200).json({
+        address,
+        chain: "base",
+        tab,
+        balanceWei: balance,
+        list,
+      });
+    }
+
     // Determine action and key pool based on tab
     const listAction =
       tab === "erc20" ? "tokentx" :
@@ -192,11 +248,16 @@ export default async function handler(req, res) {
         sort: "desc",
         apikey,
       })}`;
-      const { json } = await fetchJson(url);
-      if (!isOkOrEmpty(json)) {
-        if (isRateLimited(json)) throw new Error();
-        throw new Error();
+
+      const { json, httpStatus, ok } = await fetchJson(url);
+
+      if (!ok || !isOkOrEmpty(json)) {
+        if (isRateLimited(json, httpStatus) || isTransientHttp(httpStatus)) {
+          throw new Error("RETRY_KEY");
+        }
+        throw new Error(json?.message || "LIST_FAILED");
       }
+
       return Array.isArray(json.result) ? json.result : [];
     });
 
@@ -204,7 +265,6 @@ export default async function handler(req, res) {
     let txCount = null;
     if (wantCount && COUNT_KEYS.length) {
       const PAGE = 1000;
-      const CAP = 1000;
 
       const pageLen = async (apikey, p) => {
         const url = `${API}?${qs({
@@ -217,30 +277,30 @@ export default async function handler(req, res) {
           sort: "desc",
           apikey,
         })}`;
-        const { json } = await fetchJson(url);
-        if (!isOkOrEmpty(json)) {
-          if (isRateLimited(json)) throw new Error();
-          throw new Error();
+
+        const { json, httpStatus, ok } = await fetchJson(url);
+
+        if (!ok || !isOkOrEmpty(json)) {
+          if (isRateLimited(json, httpStatus) || isTransientHttp(httpStatus)) {
+            throw new Error("RETRY_KEY");
+          }
+          throw new Error(json?.message || "COUNT_FAILED");
         }
+
         return Array.isArray(json.result) ? json.result.length : 0;
       };
 
       try {
         txCount = await tryWithPool(COUNT_KEYS, async (apikey) => {
           const l1 = await pageLen(apikey, 1);
-
           if (l1 === 0) return 0;
           if (l1 < PAGE) return l1;
-
           return "1K+";
         });
       } catch {
         txCount = null;
       }
     }
-
-    // Set caching headers and return response
-    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
 
     return res.status(200).json({
       address,
@@ -252,6 +312,8 @@ export default async function handler(req, res) {
       list,
     });
   } catch (e) {
+    // Optional: expose minimal signal for debugging without leaking internals
+    // const msg = (e && e.message) ? e.message : "";
     return res.status(500).json({ error: "Internal server error" });
   }
 }
