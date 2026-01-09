@@ -551,3 +551,7 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+#featuredActions {
+  margin-top: 20px;
+}
