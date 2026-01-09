@@ -379,7 +379,7 @@ function renderInternalTable(list = []) {
     .map((t) => {
       const hash = t.hash || t.transactionHash || "-";
       const typ = (t.type || t.callType || "-").toString();
-      const val = weiToThStr(t.value) ?? "0.000000"; // typo fix below
+      const val = weiToEthStr(t.value) ?? "0.000000"; // typo fix below
 
       return `
         <tr>
