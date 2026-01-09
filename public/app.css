@@ -490,3 +490,28 @@ th {
 body[data-page="detail"] .profile {
   display: none;
 }
+
+/* ===== Detail Top Bar ===== */
+.detailBar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+
+  display: flex;
+  align-items: center;
+
+  padding: 10px 12px;
+  margin-bottom: 12px;
+
+  background: rgba(10, 20, 40, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+}
+
+/* Back button lebih kecil & rapi */
+.backBtn {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.detailBar { border-radius: 14px; }
+body[data-page="detail"] .detailHeader { margin-top: 0; }
