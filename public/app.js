@@ -13,7 +13,7 @@ function shortHex(h, a = 6, b = 4) {
   return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
 }
 
-// 
+// DIPERBAIKI: hapus spasi ekstra setelah path
 function makeBaseScanUrl(q) {
   if (isTx(q)) return `https://basescan.org/tx/${q}`;
   if (isAddress(q)) return `https://basescan.org/address/${q}`;
@@ -101,6 +101,73 @@ function renderTxCount(v) {
   }
   return String(v);
 }
+
+// ============== BARU: USD Formatter & Featured Actions ==============
+
+function fmtUSD(v) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
+  if (v < 0.01) return `$${v.toFixed(6)}`;
+  if (v < 1) return `$${v.toFixed(4)}`;
+  return `$${v.toFixed(2)}`;
+}
+
+function renderFeaturedActionsCard(data) {
+  const list = data?.featuredActions || [];
+  const rows = list.map((r) => `
+    <tr>
+      <td>${r.label}</td>
+      <td class="num">${fmtUSD(r.low)}</td>
+      <td class="num">${fmtUSD(r.average)}</td>
+      <td class="num">${fmtUSD(r.high)}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <div class="card">
+      <div class="cardTitle">Featured Actions</div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th class="num">Low</th>
+            <th class="num">Average</th>
+            <th class="num">High</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows || `<tr><td colspan="4">No data</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadFeaturedActions() {
+  const el = document.getElementById("featuredActions");
+  if (!el) return;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="cardTitle">Featured Actions</div>
+      <div class="muted">Loading...</div>
+    </div>
+  `;
+
+  try {
+    const r = await fetch("/api/featured-actions");
+    const j = await r.json();
+    el.innerHTML = renderFeaturedActionsCard(j);
+  } catch (e) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="cardTitle">Featured Actions</div>
+        <div class="muted">Gagal memuat data</div>
+      </div>
+    `;
+  }
+}
+
+// ===================================================================
 
 /* =========================
    Overview State
@@ -662,6 +729,8 @@ function handleRoute() {
   } else {
     showPage("home");
     startGasAutoRefresh();
+    // 🔥 Muat Featured Actions hanya di halaman home
+    loadFeaturedActions();
   }
 }
 
