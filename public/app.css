@@ -49,8 +49,6 @@ body {
   box-shadow:
     0 30px 80px rgba(0,60,180,.45),
     inset 0 1px 0 rgba(255,255,255,.45);
-
-  /* penting untuk floating Back */
   position: relative;
 }
 
@@ -124,6 +122,56 @@ body {
   box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
 }
 
+/* =========================
+   Internal Transactions
+========================= */
+
+.internalBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c8cff, #3b82f6);
+  color: #fff;
+}
+
+.tableWrap.internal table th {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tableWrap.internal table td {
+  font-size: 13px;
+}
+
+.tableWrap.internal .valueMinus {
+  color: #fb7185;
+  font-weight: 600;
+}
+
+.tableWrap.internal .valuePlus {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.tableWrap.internal .addr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* active tab visual */
+#tabInternal:not(.secondary) {
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: #fff;
+}
+
+/* small helper */
+.internalNote {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 /* =====================
    FORM & BUTTONS
 ===================== */
@@ -185,7 +233,7 @@ button.secondary {
   align-items: center;
   gap: 10px;
   z-index: 5;
-  pointer-events: none; /* biar hanya tombolnya yang clickable */
+  pointer-events: none;
 }
 
 .backBtn {
@@ -195,7 +243,6 @@ button.secondary {
   font-size: 13px;
 }
 
-/* hide link basescan under profile (tetap ada elemennya) */
 #link {
   display: none !important;
 }
