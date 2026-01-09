@@ -143,7 +143,9 @@ function showPage(page) {
   const home = $("pageHome");
   const detail = $("pageDetail");
   if (!home || !detail) return;
-
+   
+  document.body.setAttribute("data-page", page);
+   
   if (page === "detail") {
     home.style.display = "none";
     detail.style.display = "block";
