@@ -13,7 +13,7 @@ function shortHex(h, a = 6, b = 4) {
   return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
 }
 
-// ✅ DIPERBAIKI: HAPUS SPASI DI URL — sebelumnya ada spasi setelah path!
+// 
 function makeBaseScanUrl(q) {
   if (isTx(q)) return `https://basescan.org/tx/${q}`;
   if (isAddress(q)) return `https://basescan.org/address/${q}`;
