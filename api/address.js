@@ -1,7 +1,14 @@
 export default async function handler(req, res) {
   try {
     const address = (req.query.address || "").toString().trim();
-    const tab = (req.query.tab || "tx").toString().trim().toLowerCase() === "erc20" ? "erc20" : "tx";
+
+    // internal
+    const tabRaw = (req.query.tab || "tx").toString().trim().toLowerCase();
+    const tab =
+      tabRaw === "erc20" ? "erc20" :
+      tabRaw === "internal" ? "internal" :
+      "tx";
+
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
     const offset = Math.min(25, Math.max(1, parseInt(req.query.offset || "25", 10)));
     const wantCount = (req.query.count ?? "1").toString() !== "0";
@@ -29,6 +36,14 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY_10,
       process.env.ETHERSCAN_API_KEY_11,
       process.env.ETHERSCAN_API_KEY_12,
+    ].filter(Boolean);
+
+    // INTERNAL TX KEYS
+    const INTERNAL_KEYS = [
+      process.env.ETHERSCAN_API_KEY_21,
+      process.env.ETHERSCAN_API_KEY_22,
+      process.env.ETHERSCAN_API_KEY_23,
+      process.env.ETHERSCAN_API_KEY_24,
     ].filter(Boolean);
 
     const COUNT_KEYS = [
@@ -91,8 +106,17 @@ export default async function handler(req, res) {
       return json.result;
     });
 
-    const listAction = tab === "erc20" ? "tokentx" : "txlist";
-    const listPool = tab === "erc20" ? ERC20_KEYS : TX_KEYS;
+    // internal tx action
+    const listAction =
+      tab === "erc20" ? "tokentx" :
+      tab === "internal" ? "txlistinternal" :
+      "txlist";
+
+    // pool key
+    const listPool =
+      tab === "erc20" ? ERC20_KEYS :
+      tab === "internal" ? (INTERNAL_KEYS.length ? INTERNAL_KEYS : TX_KEYS) :
+      TX_KEYS;
 
     const list = await tryWithPool(listPool, async (apikey) => {
       const url = `${API}?${qs({
