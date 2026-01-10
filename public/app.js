@@ -723,7 +723,7 @@ function handleRoute() {
     showPage("home");
     startGasAutoRefresh();
     // 
-    loadFeaturhomeActions();
+    loadFeaturedActions();
   }
 }
 
