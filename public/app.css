@@ -566,3 +566,19 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   /*  */
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+
+/* Wajib biar ellipsis di tabel bener-bener jalan */
+.tbl {
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* Kalau kolom ID = kolom ke-5 */
+.tbl th:nth-child(5),
+.tbl td:nth-child(5) {
+  width: 110px;              /* pakai width, bukan max-width */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
