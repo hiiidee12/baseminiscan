@@ -482,7 +482,7 @@ function renderNftTable(list = []) {
       <td class="small id">
   #${(() => {
     const v = String(t.tokenID || "");
-    return v.length > 4 ? v.slice(0, 4) + "…" : v;
+    return v.length > 5 ? v.slice(0, 5) + "…" : v;
   })()}
 </td>
     </tr>
