@@ -555,3 +555,14 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 #featuredActions {
   margin-top: 20px;
 }
+
+/* NFT ID */
+.tbl td:nth-child(5) {
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  /*  */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
