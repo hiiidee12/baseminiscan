@@ -479,7 +479,12 @@ function renderNftTable(list = []) {
       <td>${t.tokenName || "-"}</td>
       <td class="small">${shortHex(t.from)}</td>
       <td class="small">${shortHex(t.to)}</td>
-      <td class="small id">#${t.tokenID || "-"}</td>
+      <td class="small id">
+  #${(() => {
+    const v = String(t.tokenID || "");
+    return v.length > 4 ? v.slice(0, 4) + "…" : v;
+  })()}
+</td>
     </tr>
   `).join("");
 
