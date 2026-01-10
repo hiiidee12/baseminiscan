@@ -5,7 +5,7 @@
     "iconUrl": "https://baseminiscan.vercel.app/icon.png",
     "homeUrl": "https://baseminiscan.vercel.app",
     "imageUrl": "https://baseminiscan.vercel.app/icon.png",
-    "splashImageUrl": "https://baseminiscan.vercel.app/icon.png",
+    "splashImageUrl": "https://baseminiscan.vercel.app/spx.png",
     "splashBackgroundColor": "#020617",
     "webhookUrl": "https://baseminiscan.vercel.app/api/webhook",
     "subtitle": "Base explorer helper",
