@@ -477,9 +477,9 @@ function renderNftTable(list = []) {
       <td class="small">${ageFromTs(t.timeStamp)}</td>
       <td class="small">${t.nftStd || "-"}</td>
       <td>${t.tokenName || "-"}</td>
-      <td class="small">#${t.tokenID || "?"}</td>
       <td class="small">${shortHex(t.from)}</td>
       <td class="small">${shortHex(t.to)}</td>
+      <td class="small id">#${t.tokenID || "-"}</td>
     </tr>
   `).join("");
 
@@ -490,8 +490,8 @@ function renderNftTable(list = []) {
           <thead>
             <tr>
               <th>Tx</th><th>Age</th><th>Std</th>
-              <th>Collection</th><th>ID</th>
-              <th>From</th><th>To</th>
+              <th>Collection</th>
+              <th>From</th><th>To</th><th>ID</th>
             </tr>
           </thead>
           <tbody>${rows || `<tr><td colspan="7">No NFT transfers</td></tr>`}</tbody>
