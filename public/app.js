@@ -13,7 +13,7 @@ function shortHex(h, a = 6, b = 4) {
   return `${h.slice(0, a + 2)}…${h.slice(-b)}`;
 }
 
-// DIPERBAIKI: hapus spasi ekstra setelah path
+// 
 function makeBaseScanUrl(q) {
   if (isTx(q)) return `https://basescan.org/tx/${q}`;
   if (isAddress(q)) return `https://basescan.org/address/${q}`;
@@ -161,7 +161,7 @@ async function loadFeaturedActions() {
     el.innerHTML = `
       <div class="card">
         <div class="cardTitle">Featured Actions</div>
-        <div class="muted">Gagal memuat data</div>
+        <div class="muted">Failed to load data!</div>
       </div>
     `;
   }
@@ -722,8 +722,8 @@ function handleRoute() {
   } else {
     showPage("home");
     startGasAutoRefresh();
-    // 🔥 Muat Featured Actions hanya di halaman home
-    loadFeaturedActions();
+    // 
+    loadFeaturhomeActions();
   }
 }
 
