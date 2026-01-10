@@ -555,12 +555,3 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 #featuredActions {
   margin-top: 20px;
 }
-
-td.id {
-  width: 110px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: right;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
