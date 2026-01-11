@@ -675,17 +675,17 @@ function renderGas(data) {
   return `
     <div class="gasGrid">
       <div class="gasCard">
-        <div class="gasLabel">🙂 Standard</div>
+        <div class="gasLabel">❄ Standard</div>
         <div class="gasValue">${safe} <span class="unit">Gwei</span></div>
         <div class="muted">~ 12–16 secs</div>
       </div>
       <div class="gasCard">
-        <div class="gasLabel">😄 Fast</div>
+        <div class="gasLabel">🌞 Fast</div>
         <div class="gasValue">${fast} <span class="unit">Gwei</span></div>
         <div class="muted">~ 6–8 secs</div>
       </div>
       <div class="gasCard">
-        <div class="gasLabel">🚀 Rapid</div>
+        <div class="gasLabel">⚡ Rapid</div>
         <div class="gasValue">${rapid} <span class="unit">Gwei</span></div>
         <div class="muted">~ 2–3 secs</div>
       </div>  
