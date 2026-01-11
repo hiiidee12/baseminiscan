@@ -640,3 +640,52 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   position: relative;
   z-index: 1;
 }
+
+/* === Featured Actions: same gradient style as profile, but softer === */
+.featuredCard{
+  position: relative;
+  overflow: hidden;
+
+  border-radius: 18px;
+  color: #fff;
+
+  /* base glass */
+  background: rgba(10, 14, 28, .62);
+  border: 1px solid rgba(255,255,255,.12);
+
+  box-shadow:
+    0 10px 26px rgba(0,0,0,.26),
+    inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* radial gradient (mirip profile, tapi lebih halus) */
+.featuredCard::before{
+  content:"";
+  position:absolute;
+  inset:-80px;
+
+  background:
+    radial-gradient(circle at 20% 15%, rgba(11, 92, 255, 0.32), transparent 55%),
+    radial-gradient(circle at 85% 85%, rgba(79, 163, 255, 0.20), transparent 60%),
+    radial-gradient(circle at 55% 40%, rgba(47, 128, 255, 0.12), transparent 65%);
+
+  opacity: .9;
+  pointer-events:none;
+}
+
+/* glass overlay tipis */
+.featuredCard::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background: rgba(255,255,255,.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events:none;
+}
+
+/* pastikan isi table di atas gradient */
+.featuredCard > *{
+  position: relative;
+  z-index: 1;
+}
