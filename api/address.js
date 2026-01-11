@@ -42,6 +42,8 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY_6,
       process.env.ETHERSCAN_API_KEY_7,
       process.env.ETHERSCAN_API_KEY_8,
+      process.env.ETHERSCAN_API_KEY_33,
+      process.env.ETHERSCAN_API_KEY_34,
     ].filter(Boolean);
 
     const ERC20_KEYS = [
