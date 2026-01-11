@@ -555,3 +555,11 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 #featuredActions {
   margin-top: 20px;
 }
+
+.fcUser {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 4px;
+  color: #fff;
+}
