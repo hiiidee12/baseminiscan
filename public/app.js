@@ -377,7 +377,7 @@ function ageFromTs(ts) {
 }
 
 async function loadFarcasterUsername(address) {
-  const el = document.getElementById("fcUser");
+  const el = document.getElementById("fcUserDetail");
   if (!el) return;
 
   el.textContent = "-";
