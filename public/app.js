@@ -377,6 +377,9 @@ function ageFromTs(ts) {
 }
 
 async function loadFarcasterUsername(address) {
+  if (__lastFarcasterAddress === address) return;
+  __lastFarcasterAddress = address;
+
   const el = document.getElementById("fcUserDetail");
   if (!el) return;
 
@@ -528,6 +531,7 @@ function renderNftTable(list = []) {
    Detail Loader
 ========================= */
 
+let __lastFarcasterAddress = null;
 let __detailAddress = null;
 let __detailTab = "tx";
 
