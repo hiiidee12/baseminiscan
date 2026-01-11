@@ -689,3 +689,28 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   position: relative;
   z-index: 1;
 }
+
+/* === Main container (glass card) === */
+.card{
+  position: relative;
+  overflow: hidden;
+}
+
+/* soft featured-like gradient */
+.card::before{
+  content:"";
+  position:absolute;
+  inset:-160px;
+
+  background:
+    radial-gradient(circle at 22% 12%, rgba(47,128,255,.10), transparent 55%),
+    radial-gradient(circle at 85% 90%, rgba(79,163,255,.06), transparent 60%);
+
+  opacity:.85;
+  pointer-events:none;
+}
+
+.card > *{
+  position: relative;
+  z-index: 1;
+}
