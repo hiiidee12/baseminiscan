@@ -376,6 +376,24 @@ function ageFromTs(ts) {
   return `${Math.floor(d / 86400)}d ago`;
 }
 
+async function loadFarcasterUsername(address) {
+  const el = document.getElementById("fcUser");
+  if (!el) return;
+
+  el.textContent = "-";
+
+  try {
+    const r = await fetch(`/api/farcaster?address=${encodeURIComponent(address)}`);
+    const j = await r.json();
+
+    if (!j.ok || !j.username) return;
+
+    el.textContent = "@" + j.username;
+  } catch (e) {
+    // silent
+  }
+}
+
 function renderTxTable(list = []) {
   const rows = list.slice(0, 25).map(tx => `
     <tr>
@@ -537,6 +555,7 @@ async function loadDetail(address, tab = "tx") {
   showPage("detail");
   setActiveDetailTab(tab);
 
+  loadFarcasterUsername(address);
   overviewState.address = address;
   hideLinkRow();
   applyOverviewFromState();
