@@ -548,7 +548,7 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 }
 
 .tbl .num {
-  text-align: left;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
