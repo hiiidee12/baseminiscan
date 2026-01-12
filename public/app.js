@@ -706,7 +706,7 @@ async function loadGasOnce() {
 
   if (!out.dataset.ready) {
     out.dataset.ready = "1";
-    out.innerHTML = renderGas({}); #gasStandardVal/#gasFastVal/#gasRapidVal
+    out.innerHTML = renderGas({}); 
   }
 
   try {
