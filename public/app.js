@@ -704,10 +704,9 @@ async function loadGasOnce() {
   const out = $("gasOutput");
   if (!out) return;
 
-  // render layout sekali saja
   if (!out.dataset.ready) {
     out.dataset.ready = "1";
-    out.innerHTML = renderGas({}); // bikin elemen #gasStandardVal/#gasFastVal/#gasRapidVal
+    out.innerHTML = renderGas({}); #gasStandardVal/#gasFastVal/#gasRapidVal
   }
 
   try {
@@ -715,7 +714,7 @@ async function loadGasOnce() {
     const j = await r.json();
     if (!r.ok || j?.error) throw j;
 
-    updateGasValues(j); // cuma update angka
+    updateGasValues(j); 
   } catch (e) {
     console.log("gas error", e);
   }
