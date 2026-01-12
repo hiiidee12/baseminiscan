@@ -651,46 +651,6 @@ function renderGasError(err) {
   return `<pre>${JSON.stringify(err, null, 2)}</pre>`;
 }
 
-function renderGas(data) {
-  const safeRaw = data?.safe ?? data?.standard ?? data?.slow ?? null;
-  const fastRaw = data?.fast ?? null;
-  const rapidRaw = data?.rapid ?? data?.pro ?? null;
-
-  const safe = formatGwei(safeRaw);
-  const fast = formatGwei(fastRaw);
-  const rapid = formatGwei(rapidRaw);
-  const lastBlock = data?.lastBlock ?? "—";
-
-  let util = "—";
-  const ratio = toNum(data?.gasUsedRatio);
-  if (Number.isFinite(ratio)) {
-    const pct = ratio <= 1 ? ratio * 100 : ratio;
-    util = `${pct.toFixed(2)}%`;
-  }
-
-  const src = data?.source ? String(data.source) : "—";
-
-  return `
-    <div class="gasGrid">
-      <div class="gasCard">
-        <div class="gasLabel">❄ Standard</div>
-        <div class="gasValue"><span id="gasStandardVal">${safe}</span> <span class="unit">Gwei</span></div>
-        <div class="muted">~ 12–16 secs</div>
-      </div>
-      <div class="gasCard">
-        <div class="gasLabel">🌞 Fast</div>
-        <div class="gasValue"><span id="gasFastVal">${fast}</span> <span class="unit">Gwei</span></div>
-        <div class="muted">~ 6–8 secs</div>
-      </div>
-      <div class="gasCard">
-        <div class="gasLabel">⚡ Rapid</div>
-        <div class="gasValue"><span id="gasRapidVal">${rapid}</span> <span class="unit">Gwei</span></div>
-        <div class="muted">~ 2–3 secs</div>
-      </div>  
-    </div>
-  `;
-}
-
 function updateGasValues(data) {
   const safeRaw  = data?.safe ?? data?.standard ?? data?.slow ?? null;
   const fastRaw  = data?.fast ?? null;
@@ -708,6 +668,57 @@ function updateGasValues(data) {
   if (c) c.textContent = rapid;
 }
   
+function renderGas(data = {}) {
+  const safeRaw  = data?.safe ?? data?.standard ?? data?.slow ?? null;
+  const fastRaw  = data?.fast ?? null;
+  const rapidRaw = data?.rapid ?? data?.pro ?? null;
+
+  const safe  = formatGwei(safeRaw);
+  const fast  = formatGwei(fastRaw);
+  const rapid = formatGwei(rapidRaw);
+
+  return `
+    <div class="gasGrid">
+      <div class="gasCard">
+        <div class="gasLabel">❄️ Standard</div>
+        <div class="gasValue"><span id="gasStandardVal">${safe}</span> <span class="unit">Gwei</span></div>
+        <div class="muted">~ 12–16 secs</div>
+      </div>
+
+      <div class="gasCard">
+        <div class="gasLabel">🌞 Fast</div>
+        <div class="gasValue"><span id="gasFastVal">${fast}</span> <span class="unit">Gwei</span></div>
+        <div class="muted">~ 6–8 secs</div>
+      </div>
+
+      <div class="gasCard">
+        <div class="gasLabel">⚡ Rapid</div>
+        <div class="gasValue"><span id="gasRapidVal">${rapid}</span> <span class="unit">Gwei</span></div>
+        <div class="muted">~ 2–3 secs</div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadGasOnce() {
+  const out = $("gasOutput");
+  if (!out) return;
+
+  // render layout sekali saja
+  if (!out.dataset.ready) {
+    out.dataset.ready = "1";
+    out.innerHTML = renderGas({}); // bikin elemen #gasStandardVal/#gasFastVal/#gasRapidVal
+  }
+
+  try {
+    const r = await fetch("/api/gas", { cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok || j?.error) throw j;
+
+    updateGasValues(j); // cuma update angka
+  } catch (e) {
+    console.log("gas error", e);
+  }
 }
 function startGasAutoRefresh() {
   stopGasAutoRefresh();
