@@ -758,7 +758,6 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   z-index: 1;
 }
 
-/* Featured Actions – desktop fix */
 #featuredActions{
   max-width: 520px;
   margin: 18px auto 0;
@@ -768,15 +767,6 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-}
-
-#featuredActions th,
-#featuredActions td{
-  padding: 12px 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
 }
 
 #featuredActions th{
@@ -791,12 +781,9 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   line-height: 1.15;
 }
 
-#featuredActions th:nth-child(2),
-#featuredActions td:nth-child(2),
-#featuredActions th:nth-child(3),
-#featuredActions td:nth-child(3),
-#featuredActions th:nth-child(4),
-#featuredActions td:nth-child(4){
-  width: 19.33%;
-  text-align: right;
+#featuredActions td:not(:first-child),
+#featuredActions th:not(:first-child){
+  white-space: nowrap;
+  overflow: visible;
+  font-variant-numeric: tabular-nums;
 }
