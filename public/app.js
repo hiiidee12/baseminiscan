@@ -674,38 +674,41 @@ function renderGas(data) {
     <div class="gasGrid">
       <div class="gasCard">
         <div class="gasLabel">❄ Standard</div>
-        <div class="gasValue">${safe} <span class="unit">Gwei</span></div>
+        <div class="gasValue"><span id="gasStandardVal">${safe}</span> <span class="unit">Gwei</span></div>
         <div class="muted">~ 12–16 secs</div>
       </div>
       <div class="gasCard">
         <div class="gasLabel">🌞 Fast</div>
-        <div class="gasValue">${fast} <span class="unit">Gwei</span></div>
+        <div class="gasValue"><span id="gasFastVal">${fast}</span> <span class="unit">Gwei</span></div>
         <div class="muted">~ 6–8 secs</div>
       </div>
       <div class="gasCard">
         <div class="gasLabel">⚡ Rapid</div>
-        <div class="gasValue">${rapid} <span class="unit">Gwei</span></div>
+        <div class="gasValue"><span id="gasRapidVal">${rapid}</span> <span class="unit">Gwei</span></div>
         <div class="muted">~ 2–3 secs</div>
       </div>  
     </div>
   `;
 }
 
-async function loadGasOnce() {
-  const out = $("gasOutput");
-  if (!out) return;
-  out.innerHTML = renderGasSkeleton();
+function updateGasValues(data) {
+  const safeRaw  = data?.safe ?? data?.standard ?? data?.slow ?? null;
+  const fastRaw  = data?.fast ?? null;
+  const rapidRaw = data?.rapid ?? data?.pro ?? null;
 
-  try {
-    const r = await fetch("/api/gas", { cache: "no-store" });
-    const j = await r.json();
-    if (!r.ok || j?.error) throw j;
-    out.innerHTML = renderGas(j);
-  } catch (e) {
-    out.innerHTML = renderGasError(e);
-  }
+  const safe  = formatGwei(safeRaw);
+  const fast  = formatGwei(fastRaw);
+  const rapid = formatGwei(rapidRaw);
+
+  const a = document.getElementById("gasStandardVal");
+  const b = document.getElementById("gasFastVal");
+  const c = document.getElementById("gasRapidVal");
+  if (a) a.textContent = safe;
+  if (b) b.textContent = fast;
+  if (c) c.textContent = rapid;
 }
-
+  
+}
 function startGasAutoRefresh() {
   stopGasAutoRefresh();
 
