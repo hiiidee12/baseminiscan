@@ -757,33 +757,3 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   position: relative;
   z-index: 1;
 }
-
-#featuredActions{
-  max-width: 520px;
-  margin: 18px auto 0;
-}
-
-#featuredActions table{
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-#featuredActions th{
-  text-align: right;
-}
-
-#featuredActions th:first-child,
-#featuredActions td:first-child{
-  text-align: left;
-  width: 42%;
-  white-space: normal;
-  line-height: 1.15;
-}
-
-#featuredActions td:not(:first-child),
-#featuredActions th:not(:first-child){
-  white-space: nowrap;
-  overflow: visible;
-  font-variant-numeric: tabular-nums;
-}
