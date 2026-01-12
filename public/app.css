@@ -600,7 +600,7 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   padding: 14px 16px;
   color: #fff;
 
-  /* base gelap */
+  /* base */
   background: rgba(10, 14, 28, .72);
   border: 1px solid rgba(255,255,255,.12);
 
@@ -609,7 +609,7 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
     inset 0 0 0 1px rgba(255,255,255,.08);
 }
 
-/* radial glow (mirip background, tapi lebih “deep”) */
+/* radial glow */
 .profileCard::before{
   content:"";
   position:absolute;
@@ -624,7 +624,7 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   pointer-events:none;
 }
 
-/* glass layer tipis biar nyatu sama card lain */
+/* */
 .profileCard::after{
   content:"";
   position:absolute;
@@ -658,7 +658,7 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
     inset 0 0 0 1px rgba(255,255,255,.06);
 }
 
-/* radial gradient (mirip profile, tapi lebih halus) */
+/* */
 .featuredCard::before{
   content:"";
   position:absolute;
@@ -711,6 +711,49 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 }
 
 .card > *{
+  position: relative;
+  z-index: 1;
+}
+
+/* === Fix: Featured Actions corners bleeding === */
+.featuredCard{
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;          
+  isolation: isolate;        
+}
+
+/
+.featuredCard::before{
+  content:"";
+  position:absolute;
+  inset: 0;                  
+  border-radius: inherit;    
+  pointer-events:none;
+
+  background:
+    radial-gradient(circle at 20% 15%, rgba(11, 92, 255, 0.32), transparent 55%),
+    radial-gradient(circle at 85% 85%, rgba(79, 163, 255, 0.20), transparent 60%),
+    radial-gradient(circle at 55% 40%, rgba(47, 128, 255, 0.12), transparent 65%);
+
+  opacity: .9;
+}
+
+/* */
+.featuredCard::after{
+  content:"";
+  position:absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events:none;
+
+  background: rgba(255,255,255,.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/*  */
+.featuredCard > *{
   position: relative;
   z-index: 1;
 }
