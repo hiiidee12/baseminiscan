@@ -757,3 +757,46 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   position: relative;
   z-index: 1;
 }
+
+/* Featured Actions – desktop fix */
+#featuredActions{
+  max-width: 520px;
+  margin: 18px auto 0;
+}
+
+#featuredActions table{
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#featuredActions th,
+#featuredActions td{
+  padding: 12px 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+#featuredActions th{
+  text-align: right;
+}
+
+#featuredActions th:first-child,
+#featuredActions td:first-child{
+  text-align: left;
+  width: 42%;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+#featuredActions th:nth-child(2),
+#featuredActions td:nth-child(2),
+#featuredActions th:nth-child(3),
+#featuredActions td:nth-child(3),
+#featuredActions th:nth-child(4),
+#featuredActions td:nth-child(4){
+  width: 19.33%;
+  text-align: right;
+}
