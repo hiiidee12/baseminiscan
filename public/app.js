@@ -106,9 +106,7 @@ function renderTxCount(v) {
 
 function fmtUSD(v) {
   if (v === null || v === undefined || !Number.isFinite(v)) return "—";
-  if (v < 0.01) return `$${v.toFixed(6)}`;
-  if (v < 1) return `$${v.toFixed(4)}`;
-  return `$${v.toFixed(2)}`;
+  return `$${v.toFixed(4)}`;
 }
 
 function renderFeaturedActionsCard(data) {
