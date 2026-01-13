@@ -1,67 +1,3 @@
-function __formatEthFromWei(balanceWei) {
-  try {
-    if (balanceWei === null || balanceWei === undefined) return null;
-
-    // terima string/number/bigint
-    const wei = typeof balanceWei === "bigint" ? balanceWei : BigInt(String(balanceWei));
-    const neg = wei < 0n;
-    const w = neg ? -wei : wei;
-
-    const ETH = 10n ** 18n;
-    const whole = w / ETH;
-    const frac = w % ETH;
-
-    // ambil 8 decimal biar kecil ga jadi 0
-    const fracStr = frac.toString().padStart(18, "0").slice(0, 8);
-    let s = `${whole.toString()}.${fracStr}`.replace(/\.?0+$/, "");
-    if (!s.includes(".")) s = `${s}.0`;
-
-    return neg ? `-${s}` : s;
-  } catch {
-    return null;
-  }
-}
-
-function __formatNeynar(v) {
-  if (typeof v !== "number" || !Number.isFinite(v)) return null;
-  // 2 decimal cukup
-  return String(Math.round(v * 100) / 100);
-}
-
-function __buildProfileReply(context) {
-  const address = context?.address || null;
-
-  const username = context?.farcaster?.username || null;
-  const neynarScoreRaw = context?.farcaster?.neynarScore ?? null;
-
-  const balanceEth = __formatEthFromWei(context?.balanceWei);
-  const txCount = context?.txCount ?? null;
-
-  const farcasterLine = `🧐 Farcaster: ${username || "Data not available"}`;
-  const neynarLine = `🥳 Neynar: ${__formatNeynar(neynarScoreRaw) || "Data not available"}`;
-  const balLine = `🤑 Balance: ${balanceEth ? `${balanceEth} ETH` : "Data not available"}`;
-  const txLine = `🤯 Total TX: ${txCount !== null && txCount !== undefined ? String(txCount) : "Data not available"}`;
-
-  // link farcaster web (dibuka di in-app Farcaster juga)
-  const profileUrl = username ? `https://farcaster.xyz/u/${encodeURIComponent(username)}` : null;
-
-  const link1 = profileUrl ? `🔗 Open Farcaster Profile\n${profileUrl}` : `🔗 Open Farcaster Profile\nData not available`;
-  const link2 = address ? `🌐 Open in Browser\nhttps://basescan.org/address/${encodeURIComponent(address)}` : `🌐 Open in Browser\nData not available`;
-
-  // address di atas kalau kamu mau, tinggal aktifkan:
-  // const addrLine = address ? address : "Data not available";
-
-  return [
-    farcasterLine,
-    neynarLine,
-    balLine,
-    txLine,
-    "",
-    link1,
-    link2,
-  ].join("\n");
-}
-
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -69,25 +5,158 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
+  const apiKey = process.env.GEMINI_API_KEY;
+
   try {
     const body = req.body || {};
     const message = String(body.message || "").trim();
     const context = body.context ?? null;
+    const history = Array.isArray(body.history) ? body.history : [];
 
     if (!message) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // kalau ada address di context -> balikin format profile yang kamu mau (deterministic)
-    if (context?.address) {
-      const reply = __buildProfileReply(context);
-      return res.status(200).json({ ok: true, reply });
+    // ====== deterministic scan output (no halu) ======
+    const address =
+      (context && typeof context === "object" && context.address) || null;
+
+    if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
+      const farcasterUsername =
+        (context && context.farcasterUsername) || null;
+
+      const neynarScoreRaw =
+        context && context.neynarScore !== undefined ? context.neynarScore : null;
+
+      const balanceEthRaw =
+        context && context.balanceEth !== undefined ? context.balanceEth : null;
+
+      const balanceWeiRaw =
+        context && context.balanceWei !== undefined ? context.balanceWei : null;
+
+      const txCountRaw =
+        context && context.txCount !== undefined ? context.txCount : null;
+
+      const safeFarcaster =
+        farcasterUsername ? String(farcasterUsername) : "Data not available";
+
+      const safeNeynar =
+        neynarScoreRaw === null || neynarScoreRaw === undefined || neynarScoreRaw === ""
+          ? "Data not available"
+          : String(neynarScoreRaw);
+
+      // balance priority: balanceEth -> convert from balanceWei -> fallback
+      let safeBalance = "Data not available";
+      if (balanceEthRaw) {
+        safeBalance = `${String(balanceEthRaw)} ETH`;
+      } else if (balanceWeiRaw && /^\d+$/.test(String(balanceWeiRaw))) {
+        // quick wei->eth (6 decimals max)
+        const w = String(balanceWeiRaw).trim().padStart(19, "0");
+        const intPart = w.slice(0, -18).replace(/^0+/, "") || "0";
+        const fracRaw = w.slice(-18);
+        const frac = fracRaw.replace(/0+$/, "");
+        const out = frac ? `${intPart}.${frac.slice(0, 6)}` : intPart;
+        safeBalance = `${out} ETH`;
+      }
+
+      const safeTx =
+        txCountRaw === null || txCountRaw === undefined || txCountRaw === ""
+          ? "Data not available"
+          : String(txCountRaw);
+
+      // Farcaster profile link (web + biasanya ke-handle in-app kalau ada)
+      const farcasterProfileUrl =
+        farcasterUsername ? `https://farcaster.xyz/${encodeURIComponent(String(farcasterUsername))}` : null;
+
+      const basescanUrl = `https://basescan.org/address/${encodeURIComponent(
+        String(address)
+      )}`;
+
+      const lines = [
+        `🧐 Farcaster: ${safeFarcaster}`,
+        `🥳 Neynar: ${safeNeynar}`,
+        `🤑 Balance: ${safeBalance}`,
+        `🤯 Total TX: ${safeTx}`,
+        "",
+      ];
+
+      if (farcasterProfileUrl) {
+        lines.push("🔗 Open Farcaster Profile");
+        lines.push(farcasterProfileUrl);
+        lines.push("");
+      } else {
+        lines.push("🔗 Open Farcaster Profile");
+        lines.push("Data not available");
+        lines.push("");
+      }
+
+      lines.push("🌐 Open in Browser");
+      lines.push(basescanUrl);
+
+      return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    return res.status(200).json({
-      ok: true,
-      reply: "Data not available.",
-    });
+    // ====== fallback Gemini for non-scan questions ======
+    if (!apiKey) {
+      return res.status(200).json({
+        ok: true,
+        reply: "Data not available.",
+      });
+    }
+
+    const safeMessage = message.slice(0, 3000);
+
+    const trimmedHistory = history.slice(-8).map((m) => ({
+      role: m?.role === "assistant" ? "model" : "user",
+      parts: [{ text: String(m?.text || "").slice(0, 2000) }],
+    }));
+
+    const systemText =
+      "You are an assistant for a Base blockchain explorer mini app. " +
+      "Respond in clean, simple English. " +
+      "Do not invent data. If data is missing, say: Data not available.";
+
+    const userPrompt =
+      `User message:\n${safeMessage}\n\n` +
+      "Rules:\n- Short answer\n- No hype";
+
+    const contents = [
+      ...trimmedHistory,
+      { role: "user", parts: [{ text: `${systemText}\n\n${userPrompt}` }] },
+    ];
+
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents,
+          generationConfig: { temperature: 0.2, maxOutputTokens: 250 },
+        }),
+      }
+    );
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok) {
+      return res
+        .status(r.status)
+        .json({ ok: false, error: "Gemini error", detail: j });
+    }
+
+    const reply =
+      j?.candidates?.[0]?.content?.parts
+        ?.map((p) => p?.text || "")
+        .join("")
+        .trim() || "Data not available.";
+
+    return res.status(200).json({ ok: true, reply });
   } catch {
     return res.status(500).json({ ok: false, error: "Server error" });
   }
