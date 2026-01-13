@@ -156,6 +156,20 @@ function __setWalletIndicator(connected, account) {
 }
 
 async function __checkWalletConnected() {
+  // Coba dulu dari Farcaster Mini-App (Warpcast)
+  try {
+    if (window.__fcSdk && (await window.__fcSdk.isInMiniApp())) {
+      const account = await window.__fcSdk.getEthereumAddress();
+      if (account && isAddress(account)) {
+        __setWalletIndicator(true, account);
+        return;
+      }
+    }
+  } catch (e) {
+    console.debug("Farcaster SDK error:", e);
+  }
+
+  // Fallback ke EIP-1193 (MetaMask, dll)
   const eth = window.ethereum;
   if (!eth || !eth.request) {
     __setWalletIndicator(false, null);
@@ -184,7 +198,7 @@ function __initWalletIndicator() {
   });
 
   eth.on("connect", () => __checkWalletConnected());
-  eth.on("disconnect", () => __setWalletIndicator(false, null));
+  eth.on("disconnect", () => __setWalletIndicator(false, null);
   eth.on("chainChanged", () => __checkWalletConnected());
 }
 // ============== BARU: USD Formatter & Featured Actions ==============
@@ -319,6 +333,20 @@ async function __ensureBaseChain() {
 }
 
 async function __walletSignInZeroTx() {
+  // Otomatis ambil dari Farcaster jika tersedia
+  try {
+    if (window.__fcSdk && (await window.__fcSdk.isInMiniApp())) {
+      const account = await window.__fcSdk.getEthereumAddress();
+      if (account && isAddress(account)) {
+        await __ensureBaseChain(); // pastikan chain Base
+        return account;
+      }
+    }
+  } catch (e) {
+    console.debug("Farcaster auto-signin failed", e);
+  }
+
+  // Fallback ke wallet tradisional (MetaMask, dll)
   const eth = window.ethereum;
   if (!eth) return null;
 
@@ -327,23 +355,9 @@ async function __walletSignInZeroTx() {
     if (!ok) return null;
 
     const accounts = await eth.request({ method: "eth_requestAccounts" });
-    const account = accounts?.[0];
-    if (!account) return null;
-
-    await eth.request({
-      method: "eth_sendTransaction",
-      params: [
-        {
-          from: account,
-          to: account,
-          value: "0x0",
-        },
-      ],
-    });
-
-    return account;
+    return accounts?.[0] || null;
   } catch (e) {
-    console.log("signin tx error", e);
+    console.log("signin error", e);
     return null;
   }
 }
@@ -919,30 +933,30 @@ window.addEventListener("DOMContentLoaded", () => {
   __initWalletIndicator();
    
   $("open")?.addEventListener("click", async () => {
-  let q = $("query")?.value?.trim() || "";
+    let q = $("query")?.value?.trim() || "";
 
-  // kalau kosong: signin + pakai address wallet
-  if (!q) {
-    const account = await __walletSignInZeroTx();
-    if (!account) return;
+    // kalau kosong: signin + pakai address wallet
+    if (!q) {
+      const account = await __walletSignInZeroTx();
+      if (!account) return;
 
-    q = account;
-    const input = $("query");
-    if (input) input.value = account;
+      q = account;
+      const input = $("query");
+      if (input) input.value = account;
 
-    setHash(`/address/${q}`);
-    return;
-  }
+      setHash(`/address/${q}`);
+      return;
+    }
 
-  // kalau address: signin dulu baru route
-  if (isAddress(q)) {
-    await __walletSignInZeroTx();
-    setHash(`/address/${q}`);
-    return;
-  }
+    // kalau address: signin dulu baru route
+    if (isAddress(q)) {
+      await __walletSignInZeroTx();
+      setHash(`/address/${q}`);
+      return;
+    }
 
-  openExternal(makeBaseScanUrl(q));
-});
+    openExternal(makeBaseScanUrl(q));
+  });
 
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
