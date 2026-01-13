@@ -30,6 +30,8 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
+$("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
   });
