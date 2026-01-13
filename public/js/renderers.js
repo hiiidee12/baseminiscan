@@ -13,13 +13,14 @@ function ageFromTs(ts) {
 }
 
 async function loadFarcasterUsername(address) {
-  if (__lastFarcasterAddress === address) return;
-  __lastFarcasterAddress = address;
+  if (window.__lastFarcasterAddress === address) return;
+  window.__lastFarcasterAddress = address;
 
-  const el = document.getElementById("fcUserDetail");
-  if (!el) return;
+  const elDetail = document.getElementById("fcUserDetail");
+  const elHome = document.getElementById("fcUser");
 
-  el.textContent = "-";
+  if (elDetail) elDetail.textContent = "-";
+  if (elHome) elHome.textContent = "@-";
 
   try {
     const r = await fetch(`/api/farcaster?address=${encodeURIComponent(address)}`);
@@ -27,138 +28,246 @@ async function loadFarcasterUsername(address) {
 
     if (!j.ok || !j.username) return;
 
-    el.textContent = "@" + j.username;
+    const v = "@" + j.username;
+    if (elDetail) elDetail.textContent = v;
+    if (elHome) elHome.textContent = v;
   } catch (e) {
     // silent
   }
 }
 
-function renderTxTable(list = []) {
-  const rows = list.slice(0, 25).map(tx => `
-    <tr>
-      <td>
-        <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">${shortHex(tx.hash)}</span>
-        <div class="small">Block ${tx.blockNumber}</div>
-      </td>
-      <td class="small">${ageFromTs(tx.timeStamp)}</td>
-      <td class="small">${shortHex(tx.from)}</td>
-      <td class="small">${shortHex(tx.to)}</td>
-      <td>${weiToEthStr(tx.value) ?? "0.000000"} ETH</td>
-    </tr>
-  `).join("");
+function renderHomeCard(data = {}) {
+  const el = document.getElementById("homeCard");
+  if (!el) return;
 
-  return `
-    <div class="tableWrap">
-      <div class="tableScroll">
-        <table>
-          <thead><tr><th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Value</th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="5">No transactions</td></tr>`}</tbody>
-        </table>
+  const address = data?.address || "";
+  const balance = data?.balance || "-";
+  const txCount = data?.txCount || "-";
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="row">
+        <div class="label">Wallet Address</div>
+        <div class="value mono">${address || "-"}</div>
+      </div>
+
+      <div class="row">
+        <div class="label">Farcaster Username</div>
+        <div class="value mono" id="fcUser">@-</div>
+      </div>
+
+      <div class="row">
+        <div class="label">ETH Balance</div>
+        <div class="value">${balance}</div>
+      </div>
+
+      <div class="row">
+        <div class="label">Total Transactions</div>
+        <div class="value">${txCount}</div>
       </div>
     </div>
+  `;
+
+  if (address) loadFarcasterUsername(address);
+}
+
+function renderDetailOverview(data = {}) {
+  const el = document.getElementById("detailOverview");
+  if (!el) return;
+
+  const address = data?.address || "";
+  const balance = data?.balance || "-";
+  const txCount = data?.txCount || "-";
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="row">
+        <div class="label">Wallet Address</div>
+        <div class="value mono">${address || "-"}</div>
+      </div>
+
+      <div class="row">
+        <div class="label">Farcaster Username</div>
+        <div class="value mono" id="fcUserDetail">-</div>
+      </div>
+
+      <div class="row">
+        <div class="label">ETH Balance</div>
+        <div class="value">${balance}</div>
+      </div>
+
+      <div class="row">
+        <div class="label">Total Transactions</div>
+        <div class="value">${txCount}</div>
+      </div>
+    </div>
+  `;
+
+  if (address) loadFarcasterUsername(address);
+}
+
+function renderTxTable(list = []) {
+  const el = document.getElementById("txTable");
+  if (!el) return;
+
+  const rows = list
+    .map(
+      (t) => `
+    <tr>
+      <td>
+        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">
+          ${shortHex(t.hash)}
+        </span>
+      </td>
+      <td class="small">${ageFromTs(t.timeStamp)}</td>
+      <td class="small">${shortHex(t.from)}</td>
+      <td class="small">${shortHex(t.to)}</td>
+      <td class="small">${formatEth(t.value)}</td>
+    </tr>
+  `
+    )
+    .join("");
+
+  el.innerHTML = `
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Tx</th>
+          <th>Age</th>
+          <th>From</th>
+          <th>To</th>
+          <th class="right">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="5" class="muted">No data</td></tr>`}
+      </tbody>
+    </table>
   `;
 }
 
 function renderErc20Table(list = []) {
-  const rows = list.slice(0, 25).map(t => {
-    const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? 0;
-    const human = formatTokenAmount(t.value, dec, 6);
-    const show = compactNumberString(human);
+  const el = document.getElementById("erc20Table");
+  if (!el) return;
 
-    return `
-      <tr>
-        <td>
-          <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
-          <div class="small">${t.tokenName ? String(t.tokenName).slice(0, 32) : ""}</div>
-        </td>
-        <td class="small">${ageFromTs(t.timeStamp)}</td>
-        <td>${t.tokenSymbol || "-"}</td>
-        <td class="small">${shortHex(t.from)}</td>
-        <td class="small">${shortHex(t.to)}</td>
-        <td title="${human}">${show}</td>
-      </tr>
-    `;
-  }).join("");
+  const rows = list
+    .map(
+      (t) => `
+    <tr>
+      <td>
+        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">
+          ${shortHex(t.hash)}
+        </span>
+      </td>
+      <td class="small">${ageFromTs(t.timeStamp)}</td>
+      <td>${t.tokenSymbol || "-"}</td>
+      <td class="small">${shortHex(t.from)}</td>
+      <td class="small">${shortHex(t.to)}</td>
+      <td class="small right">${formatTokenAmount(t.value, t.tokenDecimal)}</td>
+    </tr>
+  `
+    )
+    .join("");
 
-  return `
-    <div class="tableWrap">
-      <div class="tableScroll">
-        <table>
-          <thead><tr><th>Tx</th><th>Age</th><th>Token</th><th>From</th><th>To</th><th>Amount</th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="6">No transfers</td></tr>`}</tbody>
-        </table>
-      </div>
-    </div>
+  el.innerHTML = `
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Tx</th>
+          <th>Age</th>
+          <th>Token</th>
+          <th>From</th>
+          <th>To</th>
+          <th class="right">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="6" class="muted">No data</td></tr>`}
+      </tbody>
+    </table>
   `;
 }
 
 function renderInternalTable(list = []) {
-  const rows = list.slice(0, 25).map(t => {
-    const hash = t.hash || t.transactionHash || "-";
-    const typ = (t.type || t.callType || "-").toString();
-    const val = weiToEthStr(t.value) ?? "0.000000";
+  const el = document.getElementById("internalTable");
+  if (!el) return;
 
-    return `
-      <tr>
-        <td>
-          <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
-          <div class="small">Block ${t.blockNumber ?? "-"}</div>
-        </td>
-        <td class="small">${ageFromTs(t.timeStamp)}</td>
-        <td class="small">${shortHex(t.from)}</td>
-        <td class="small">${shortHex(t.to)}</td>
-        <td class="small">${typ}</td>
-        <td>${val} ETH</td>
-      </tr>
-    `;
-  }).join("");
+  const rows = list
+    .map(
+      (t) => `
+    <tr>
+      <td>
+        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">
+          ${shortHex(t.hash)}
+        </span>
+      </td>
+      <td class="small">${ageFromTs(t.timeStamp)}</td>
+      <td class="small">${shortHex(t.from)}</td>
+      <td class="small">${shortHex(t.to)}</td>
+      <td class="small right">${formatEth(t.value)}</td>
+    </tr>
+  `
+    )
+    .join("");
 
-  return `
-    <div class="tableWrap internal">
-      <div class="tableScroll">
-        <table>
-          <thead><tr><th>Tx</th><th>Age</th><th>From</th><th>To</th><th>Type</th><th>Value</th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="6">No internal calls</td></tr>`}</tbody>
-        </table>
-      </div>
-    </div>
+  el.innerHTML = `
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Tx</th>
+          <th>Age</th>
+          <th>From</th>
+          <th>To</th>
+          <th class="right">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="5" class="muted">No data</td></tr>`}
+      </tbody>
+    </table>
   `;
 }
 
 function renderNftTable(list = []) {
-  const rows = list.map(t => `
+  const el = document.getElementById("nftTable");
+  if (!el) return;
+
+  const rows = list
+    .map(
+      (t) => `
     <tr>
       <td>
-        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
+        <span class="click" data-open="${makeBaseScanUrl(t.hash)}">
+          ${shortHex(t.hash)}
+        </span>
       </td>
       <td class="small">${ageFromTs(t.timeStamp)}</td>
       <td class="small">${t.nftStd || "-"}</td>
       <td>${t.tokenName || "-"}</td>
+      <td class="small">#${t.tokenID || "-"}</td>
       <td class="small">${shortHex(t.from)}</td>
       <td class="small">${shortHex(t.to)}</td>
-      <td class="small id">
-  #${(() => {
-    const v = String(t.tokenID || "");
-    return v.length > 5 ? v.slice(0, 5) + "…" : v;
-  })()}
-</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join("");
 
-  return `
-    <div class="tableWrap nft">
-      <div class="tableScroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Tx</th><th>Age</th><th>Std</th>
-              <th>Collection</th>
-              <th>From</th><th>To</th><th>ID</th>
-            </tr>
-          </thead>
-          <tbody>${rows || `<tr><td colspan="7">No NFT transfers</td></tr>`}</tbody>
-        </table>
-      </div>
-    </div>
+  el.innerHTML = `
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Tx</th>
+          <th>Age</th>
+          <th>Std</th>
+          <th>Name</th>
+          <th>ID</th>
+          <th>From</th>
+          <th>To</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="7" class="muted">No data</td></tr>`}
+      </tbody>
+    </table>
   `;
 }
