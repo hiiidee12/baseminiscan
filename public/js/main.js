@@ -4,13 +4,23 @@
 
 function handleRoute() {
   const r = parseRoute();
+
   if (r.page === "detail" && isAddress(r.address)) {
     loadDetail(r.address, __detailTab || "tx");
-  } else {
-    showPage("home");
-    startGasAutoRefresh();
-    loadFeaturedActions();
+    return;
   }
+
+  if (r.page === "ai") {
+    showPage("ai");
+    window.__aiUi?.setActiveTopTab?.("ai");
+    if (typeof stopGasAutoRefresh === "function") stopGasAutoRefresh();
+    return;
+  }
+
+  showPage("home");
+  window.__aiUi?.setActiveTopTab?.("home");
+  if (typeof startGasAutoRefresh === "function") startGasAutoRefresh();
+  if (typeof loadFeaturedActions === "function") loadFeaturedActions();
 }
 
 window.addEventListener("hashchange", handleRoute);
@@ -36,9 +46,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") $("open")?.click();
   });
 
-  $("back")?.addEventListener("click", () => {
-    setHash("/");
-  });
+  $("back")?.addEventListener("click", () => setHash("/"));
 
   $("tabTx")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "tx");
