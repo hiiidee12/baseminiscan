@@ -9,7 +9,6 @@ function handleRoute() {
   } else {
     showPage("home");
     startGasAutoRefresh();
-    // 
     loadFeaturedActions();
   }
 }
@@ -29,6 +28,9 @@ window.addEventListener("DOMContentLoaded", () => {
       openExternal(makeBaseScanUrl(q));
     }
   });
+
+  $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
+  $("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
 
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
