@@ -1,7 +1,4 @@
-const KEYS = [
-  process.env.N_API_KEY_1,
-  process.env.N_API_KEY_2,
-].filter(Boolean);
+const KEYS = [process.env.N_API_KEY_1, process.env.N_API_KEY_2].filter(Boolean);
 
 // cache: address -> { ts, username, neynarScore, via }
 const CACHE = new Map();
@@ -13,6 +10,7 @@ async function fetchWithKey(address, key) {
     `?addresses=${encodeURIComponent(address)}`;
 
   return fetch(url, {
+    method: "GET",
     headers: {
       accept: "application/json",
       api_key: key,
@@ -21,13 +19,17 @@ async function fetchWithKey(address, key) {
 }
 
 function pickFirstUser(payload, address) {
+  if (!payload || typeof payload !== "object") return null;
+
+  const a = String(address || "").toLowerCase();
+
   const users =
-    payload?.users?.[address] ||
-    payload?.users?.[address?.toLowerCase?.()] ||
-    payload?.users?.[address?.toUpperCase?.()] ||
+    payload?.users?.[a] ||
+    payload?.users?.[a.toLowerCase?.()] ||
+    payload?.users?.[a.toUpperCase?.()] ||
     null;
 
-  const u = Array.isArray(users) ? (users[0] || null) : (users || null);
+  const u = Array.isArray(users) ? users[0] || null : users || null;
   if (!u) return null;
 
   const username = u?.username || null;
@@ -35,9 +37,12 @@ function pickFirstUser(payload, address) {
   // coba beberapa kemungkinan field score
   const neynarScore =
     (typeof u?.neynar_score === "number" ? u.neynar_score : null) ??
+    (typeof u?.neynarScore === "number" ? u.neynarScore : null) ??
     (typeof u?.score === "number" ? u.score : null) ??
     (typeof u?.scores?.neynar === "number" ? u.scores.neynar : null) ??
-    (typeof u?.experimental?.neynar_score === "number" ? u.experimental.neynar_score : null) ??
+    (typeof u?.experimental?.neynar_score === "number"
+      ? u.experimental.neynar_score
+      : null) ??
     null;
 
   return { username, neynarScore };
@@ -46,9 +51,19 @@ function pickFirstUser(payload, address) {
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
+  if (req.method !== "GET") {
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
+  }
+
   const address = String(req.query.address || "").trim().toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) {
     return res.status(400).json({ ok: false, error: "Invalid address" });
+  }
+
+  if (!KEYS.length) {
+    return res
+      .status(200)
+      .json({ ok: true, cached: false, username: null, neynarScore: null, via: "none" });
   }
 
   // CACHE HIT
@@ -59,7 +74,7 @@ export default async function handler(req, res) {
       cached: true,
       username: cached.username ?? null,
       neynarScore: cached.neynarScore ?? null,
-      via: cached.via,
+      via: cached.via || "cache",
     });
   }
 
@@ -70,6 +85,8 @@ export default async function handler(req, res) {
 
     try {
       const r = await fetchWithKey(address, key);
+
+      // retry on 429/5xx by moving to next key
       if (!r.ok) continue;
 
       const j = await r.json().catch(() => null);
@@ -94,6 +111,18 @@ export default async function handler(req, res) {
   }
 
   // kalau gagal semua
-  CACHE.set(address, { ts: Date.now(), username: null, neynarScore: null, via: "none" });
-  return res.status(200).json({ ok: true, cached: false, username: null, neynarScore: null, via: "none" });
+  CACHE.set(address, {
+    ts: Date.now(),
+    username: null,
+    neynarScore: null,
+    via: "none",
+  });
+
+  return res.status(200).json({
+    ok: true,
+    cached: false,
+    username: null,
+    neynarScore: null,
+    via: "none",
+  });
 }
