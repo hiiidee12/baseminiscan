@@ -39,15 +39,20 @@ export default async function handler(req, res) {
     }));
 
     const systemText =
-      "You are an assistant for a Base chain explorer mini app. " +
-      "Answer in English. Be factual, concise, and cautious. " +
-      "If data is limited, say 'limited data'. " +
-      "Do not invent transactions or labels. Use only the provided context.";
+      "You are an assistant for a Base blockchain explorer mini app. " +
+      "Respond in clean, simple English. " +
+      "Do not use markdown, asterisks, bullets, numbering, or quotation marks. " +
+      "Use short lines, one sentence per line. " +
+      "Use only the provided context. Do not invent transactions, labels, or identities. " +
+      "If data is missing, say: Data not available.";
 
     const userPrompt =
       `User message:\n${safeMessage}\n\n` +
-      `Explorer context:\n${JSON.stringify(safeContext)}\n\n` +
-      "Output rules:\n- 4–8 bullet points\n- If an address is present, include it in the first bullet\n- No hype";
+      `Explorer context (may be null):\n${JSON.stringify(safeContext)}\n\n` +
+      "Output rules:\n" +
+      "- 4 to 8 short lines\n" +
+      "- If an address is present, include it in the first line (no quotes)\n" +
+      "- No hype";
 
     const contents = [
       ...trimmedHistory,
@@ -74,7 +79,9 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => null);
 
     if (!r.ok) {
-      return res.status(r.status).json({ ok: false, error: "Gemini error", detail: j });
+      return res
+        .status(r.status)
+        .json({ ok: false, error: "Gemini error", detail: j });
     }
 
     const reply =
