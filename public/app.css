@@ -775,3 +775,52 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 body[data-page="detail"] .topTabs{
   display:none;
 }
+
+/* =========================
+   AI Mode
+========================= */
+
+.aiChat {
+  margin-top: 12px;
+  height: 260px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.aiMsg {
+  display: flex;
+  margin: 10px 0;
+}
+
+.aiMsg.user { justify-content: flex-end; }
+.aiMsg.assistant { justify-content: flex-start; }
+
+.aiBubble {
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  line-height: 1.35;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.10);
+}
+
+.aiMsg.user .aiBubble {
+  background: rgba(80,140,255,.22);
+}
+
+.aiComposer {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.aiComposer input {
+  flex: 1;
+}
