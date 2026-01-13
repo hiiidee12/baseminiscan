@@ -3,13 +3,13 @@ const KEYS = [
   process.env.N_API_KEY_2,
 ].filter(Boolean);
 
-// cache: address -> { ts, username }
+// cache: address -> { ts, username, neynarScore, via }
 const CACHE = new Map();
 const TTL = 60 * 1000; // 1 menit
 
 async function fetchWithKey(address, key) {
   const url =
-    `https://api.neynar.com/v2/farcaster/user/bulk-by-address` +
+    "https://api.neynar.com/v2/farcaster/user/bulk-by-address" +
     `?addresses=${encodeURIComponent(address)}`;
 
   return fetch(url, {
@@ -21,57 +21,79 @@ async function fetchWithKey(address, key) {
 }
 
 function pickFirstUser(payload, address) {
-  const users = payload?.[address] || payload?.users?.[address] || [];
-  const u = Array.isArray(users) ? users[0] : users;
-  return u || null;
+  const users =
+    payload?.users?.[address] ||
+    payload?.users?.[address?.toLowerCase?.()] ||
+    payload?.users?.[address?.toUpperCase?.()] ||
+    null;
+
+  const u = Array.isArray(users) ? (users[0] || null) : (users || null);
+  if (!u) return null;
+
+  const username = u?.username || null;
+
+  // coba beberapa kemungkinan field score
+  const neynarScore =
+    (typeof u?.neynar_score === "number" ? u.neynar_score : null) ??
+    (typeof u?.score === "number" ? u.score : null) ??
+    (typeof u?.scores?.neynar === "number" ? u.scores.neynar : null) ??
+    (typeof u?.experimental?.neynar_score === "number" ? u.experimental.neynar_score : null) ??
+    null;
+
+  return { username, neynarScore };
 }
 
 export default async function handler(req, res) {
-  const address = String(req.query.address || "").toLowerCase();
+  res.setHeader("Cache-Control", "no-store");
 
+  const address = String(req.query.address || "").trim().toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) {
-    return res.status(400).json({ ok: false });
+    return res.status(400).json({ ok: false, error: "Invalid address" });
   }
 
-  // ===== CACHE HIT =====
+  // CACHE HIT
   const cached = CACHE.get(address);
   if (cached && Date.now() - cached.ts < TTL) {
     return res.status(200).json({
       ok: true,
       cached: true,
-      username: cached.username,
+      username: cached.username ?? null,
+      neynarScore: cached.neynarScore ?? null,
       via: cached.via,
     });
   }
 
-  // ===== FETCH WITH FALLBACK =====
+  // FETCH WITH FALLBACK KEYS
   for (let i = 0; i < KEYS.length; i++) {
     const key = KEYS[i];
+    if (!key) continue;
+
     try {
       const r = await fetchWithKey(address, key);
-
-      // kalau rate limit / error, coba key berikutnya
       if (!r.ok) continue;
 
-      const j = await r.json();
-      const u = pickFirstUser(j, address);
-      const username = u?.username;
-
-      if (!username) continue;
+      const j = await r.json().catch(() => null);
+      const picked = pickFirstUser(j, address);
 
       const via = i === 0 ? "primary" : "backup";
-      CACHE.set(address, { ts: Date.now(), username, via });
+      const username = picked?.username ?? null;
+      const neynarScore = picked?.neynarScore ?? null;
+
+      CACHE.set(address, { ts: Date.now(), username, neynarScore, via });
 
       return res.status(200).json({
         ok: true,
         cached: false,
         username,
+        neynarScore,
         via,
       });
-    } catch (e) {
+    } catch {
       // coba key berikutnya
     }
   }
 
-  return res.status(200).json({ ok: false });
+  // kalau gagal semua
+  CACHE.set(address, { ts: Date.now(), username: null, neynarScore: null, via: "none" });
+  return res.status(200).json({ ok: true, cached: false, username: null, neynarScore: null, via: "none" });
 }
