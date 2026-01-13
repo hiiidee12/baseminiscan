@@ -35,22 +35,6 @@ function __extractAddress(text) {
   return m ? m[0] : null;
 }
 
-function __safeTxCount(j) {
-  const v =
-    j?.txCount ??
-    j?.txcount ??
-    j?.totalTx ??
-    j?.totalTxCount ??
-    j?.count ??
-    null;
-  if (typeof v === "number") return v;
-  if (typeof v === "string") {
-    const n = parseInt(v, 10);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
 async function __fetchExplorerContext(address) {
   try {
     const r = await fetch(
@@ -58,20 +42,20 @@ async function __fetchExplorerContext(address) {
       { cache: "no-store" }
     );
     const j = await r.json().catch(() => null);
-    if (!r.ok || j?.error) return null;
+    if (!r.ok || !j || j?.error) return null;
 
-    const list = Array.isArray(j?.list) ? j.list.slice(0, 25) : [];
+    const list = Array.isArray(j.list) ? j.list.slice(0, 20) : [];
 
     return {
       address,
-      balanceWei: j?.balanceWei ?? null,
-      txCount: __safeTxCount(j),
+      balanceWei: j.balanceWei ?? null,
+      txCount: j.txCount ?? j.totalTx ?? null,
       sampleTx: list.map((x) => ({
-        timeStamp: x?.timeStamp ?? null,
-        from: x?.from ?? null,
-        to: x?.to ?? null,
-        value: x?.value ?? null,
-        hash: x?.hash ?? null,
+        timeStamp: x.timeStamp,
+        from: x.from,
+        to: x.to,
+        value: x.value,
+        hash: x.hash,
       })),
     };
   } catch {
@@ -96,8 +80,8 @@ async function __aiSendNow() {
   if (btn) btn.disabled = true;
   input.disabled = true;
 
+  const thinkingIndex = __aiMessages.length;
   __aiMessages.push({ role: "assistant", text: "Thinking..." });
-  const thinkingIndex = __aiMessages.length - 1;
   __aiRender();
 
   const address = __extractAddress(text);
@@ -112,13 +96,20 @@ async function __aiSendNow() {
     const r = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, context, history }),
+      body: JSON.stringify({
+        message: text,
+        context,
+        history,
+      }),
     });
 
     const j = await r.json().catch(() => null);
     if (!r.ok || !j?.ok) throw j;
 
-    __aiMessages[thinkingIndex] = { role: "assistant", text: j?.reply || "—" };
+    __aiMessages[thinkingIndex] = {
+      role: "assistant",
+      text: (j.reply || "—").trim(),
+    };
     __aiRender();
   } catch {
     __aiMessages[thinkingIndex] = {
@@ -161,10 +152,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   if (__aiMessages.length === 0) {
-    __aiAdd(
-      "assistant",
-      "Paste an address + your question. I will analyze it using explorer data."
-    );
+    __aiAdd("assistant", "Paste an address + your question.");
   }
 });
-```0
