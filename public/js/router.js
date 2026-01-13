@@ -1,10 +1,4 @@
-/* =========================
-   Router
-========================= */
-
-function $(id) {
-  return document.getElementById(id);
-}
+// public/js/router.js
 
 function getHash() {
   return (location.hash || "#/").replace(/^#/, "");
@@ -40,4 +34,11 @@ function showPage(page) {
   home.style.display = page === "home" ? "block" : "none";
   detail.style.display = page === "detail" ? "block" : "none";
   ai.style.display = page === "ai" ? "block" : "none";
+
+  if (window.__aiUi?.setActiveTopTab) window.__aiUi.setActiveTopTab(page);
 }
+
+window.getHash = getHash;
+window.setHash = setHash;
+window.parseRoute = parseRoute;
+window.showPage = showPage;
