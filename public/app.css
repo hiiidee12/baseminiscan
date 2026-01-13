@@ -770,3 +770,8 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   min-width:120px;
   padding:0 18px;
 }
+
+/* hide HOME / AI MODE on detail page */
+body[data-page="detail"] .topTabs{
+  display:none;
+}
