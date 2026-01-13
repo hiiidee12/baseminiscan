@@ -1,11 +1,6 @@
 const KEYS = [
   process.env.N_API_KEY_1,
   process.env.N_API_KEY_2,
-
-  // fallback kalau env kamu pakai nama lain
-  process.env.NEYNAR_API_KEY,
-  process.env.NEYNAR_API_KEY_1,
-  process.env.NEYNAR_API_KEY_2,
 ].filter(Boolean);
 
 // Cache: address -> { ts, username, neynarScore, via }
@@ -19,49 +14,51 @@ const IN_FLIGHT = new Map();
 setInterval(() => {
   const now = Date.now();
   for (const [addr, entry] of CACHE.entries()) {
-    if (now - entry.ts > TTL * 5) CACHE.delete(addr);
+    if (now - entry.ts >= TTL) {
+      CACHE.delete(addr);
+    }
   }
-}, 2 * 60 * 1000).unref?.();
+}, 120_000);
 
 async function fetchWithKey(address, key) {
-  const url =
-    "https://api.neynar.com/v2/farcaster/user/bulk-by-address" +
-    `?addresses=${encodeURIComponent(address)}`;
+  const url = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${encodeURIComponent(address)}`;
 
-  return fetch(url, {
+  const res = await fetch(url, {
     headers: {
       accept: "application/json",
       api_key: key,
     },
   });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  return res.json();
 }
 
 function pickFirstUser(payload, address) {
-  const users =
-    payload?.users?.[address] ||
-    payload?.users?.[address?.toLowerCase?.()] ||
-    payload?.users?.[address?.toUpperCase?.()] ||
-    null;
+  if (!payload || typeof payload !== 'object') return null;
 
-  const u = Array.isArray(users) ? users[0] || null : users;
+  const usersMap = payload.users;
+  if (!usersMap || typeof usersMap !== 'object') return null;
 
-  const username =
-    (u && typeof u.username === "string" && u.username.trim()
-      ? u.username.trim()
-      : null) || null;
+  // Alamat sudah dinormalisasi ke lowercase
+  const users = usersMap[address];
+  const u = Array.isArray(users) ? users[0] : users;
+  if (!u || typeof u !== 'object') return null;
 
-  const neynarScoreRaw =
-    u?.user?.viewer_context?.score ??
-    u?.viewer_context?.score ??
-    u?.score ??
-    null;
+  const username = u.username || null;
 
+  // Coba beberapa lokasi kemungkinan neynar_score
   const neynarScore =
-    typeof neynarScoreRaw === "number"
-      ? neynarScoreRaw
-      : typeof neynarScoreRaw === "string"
-      ? Number(neynarScoreRaw)
-      : null;
+    (typeof u.neynar_score === "number" ? u.neynar_score : null) ||
+    (typeof u.score === "number" ? u.score : null) ||
+    (u.scores && typeof u.scores.neynar === "number" ? u.scores.neynar : null) ||
+    (u.experimental && typeof u.experimental.neynar_score === "number"
+      ? u.experimental.neynar_score
+      : null) ||
+    null;
 
   return { username, neynarScore };
 }
@@ -75,74 +72,85 @@ async function lookupAddress(address) {
       cached: true,
       username: cached.username ?? null,
       neynarScore: cached.neynarScore ?? null,
-      via: cached.via || "cache",
+      via: cached.via,
     };
   }
 
-  if (!KEYS.length) {
-    return { ok: false, error: "Missing Neynar API key(s)" };
-  }
+  // Coba tiap API key
+  for (let i = 0; i < KEYS.length; i++) {
+    const key = KEYS[i];
+    if (!key) continue;
 
-  let lastErr = null;
-
-  // coba semua key sampai dapat hasil (atau semua gagal)
-  for (const key of KEYS) {
     try {
-      const r = await fetchWithKey(address, key);
+      const data = await fetchWithKey(address, key);
+      const picked = pickFirstUser(data, address);
 
-      if (r.status === 429) {
-        lastErr = "Rate limited";
-        continue;
-      }
+      if (!picked) continue; // Tidak ada user ditemukan — coba key berikutnya?
 
-      if (!r.ok) {
-        lastErr = `HTTP ${r.status}`;
-        continue;
-      }
-
-      const j = await r.json();
-      const { username, neynarScore } = pickFirstUser(j, address);
-
-      // simpan ke cache meskipun username null (biar ga spam request)
-      CACHE.set(address, {
-        ts: Date.now(),
-        username: username ?? null,
-        neynarScore: Number.isFinite(neynarScore) ? neynarScore : null,
-        via: "neynar",
-      });
-
-      return {
+      const via = i === 0 ? "primary" : "backup";
+      const result = {
         ok: true,
         cached: false,
-        username: username ?? null,
-        neynarScore: Number.isFinite(neynarScore) ? neynarScore : null,
-        via: "neynar",
+        username: picked.username,
+        neynarScore: picked.neynarScore,
+        via,
       };
-    } catch (e) {
-      lastErr = e?.message || "Fetch failed";
+
+      // Simpan ke cache
+      CACHE.set(address, {
+        ts: Date.now(),
+        username: picked.username,
+        neynarScore: picked.neynarScore,
+        via,
+      });
+
+      return result;
+    } catch (err) {
+      // Abaikan error dan coba key berikutnya
+      console.warn(`API key ${i + 1} failed for ${address}:`, err.message);
     }
   }
 
-  return { ok: false, error: lastErr || "All keys failed" };
+  // Semua key gagal atau tidak mengembalikan data
+  const fallbackResult = {
+    ok: true,
+    cached: false,
+    username: null,
+    neynarScore: null,
+    via: "none",
+  };
+
+  CACHE.set(address, {
+    ts: Date.now(),
+    username: null,
+    neynarScore: null,
+    via: "none",
+  });
+
+  return fallbackResult;
 }
 
 export default async function handler(req, res) {
-  const address = (req.query?.address || "").toString().trim();
+  res.setHeader("Cache-Control", "no-store");
 
-  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    res.status(400).json({ ok: false, error: "Invalid address" });
-    return;
+  const rawAddress = String(req.query.address || "").trim();
+  const address = rawAddress.toLowerCase();
+
+  // Validasi format alamat Ethereum
+  if (!/^0x[a-f0-9]{40}$/.test(address)) {
+    return res.status(400).json({ ok: false, error: "Invalid address" });
   }
 
-  // dedupe in-flight
+  // Deduplikasi permintaan sedang berjalan
   if (IN_FLIGHT.has(address)) {
     try {
       const result = await IN_FLIGHT.get(address);
-      res.status(200).json(result);
-    } catch (err) {
-      res.status(500).json({ ok: false, error: "Internal server error" });
+      return res.status(200).json(result);
+    } catch {
+      // Jika in-flight gagal, lanjutkan fetch baru
+    } finally {
+      IN_FLIGHT.delete(address);
     }
-    return;
   }
 
   const fetchPromise = lookupAddress(address);
