@@ -4,14 +4,22 @@
 
 function handleRoute() {
   const r = parseRoute();
+
   if (r.page === "detail" && isAddress(r.address)) {
     loadDetail(r.address, __detailTab || "tx");
-  } else {
-    showPage("home");
-    startGasAutoRefresh();
-    // 
-    loadFeaturedActions();
+    return;
   }
+
+  if (r.page === "ai") {
+    showPage("ai");
+    window.__aiUi?.setActiveTopTab?.("ai");
+    return;
+  }
+
+  showPage("home");
+  startGasAutoRefresh();
+  loadFeaturedActions();
+  window.__aiUi?.setActiveTopTab?.("home");
 }
 
 window.addEventListener("hashchange", handleRoute);
@@ -31,7 +39,8 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
-$("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
+  $("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
+
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
   });
