@@ -916,7 +916,8 @@ window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
   hideLinkRow();
-
+  __initWalletIndicator();
+   
   $("open")?.addEventListener("click", async () => {
   let q = $("query")?.value?.trim() || "";
 
