@@ -30,7 +30,6 @@ async function loadDetail(address, tab = "tx") {
   showPage("detail");
   setActiveDetailTab(tab);
 
-  loadFarcasterUsername(address);
   overviewState.address = address;
   hideLinkRow();
   applyOverviewFromState();
@@ -44,6 +43,8 @@ async function loadDetail(address, tab = "tx") {
       tableSkeletonTx();
     out.innerHTML = overviewSkeleton() + sk;
   }
+
+  if (typeof loadFarcasterUsername === "function") loadFarcasterUsername(address);
 
   try {
     const r = await fetch(
