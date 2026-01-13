@@ -37,6 +37,7 @@ function __extractAddress(text) {
 
 async function __fetchExplorerContext(address) {
   try {
+    // 1) explorer data
     const r = await fetch(
       `/api/address?address=${encodeURIComponent(address)}&tab=tx`,
       { cache: "no-store" }
@@ -46,10 +47,27 @@ async function __fetchExplorerContext(address) {
 
     const list = Array.isArray(j.list) ? j.list.slice(0, 20) : [];
 
+    // 2) farcaster + neynar proxy (API kamu)
+    let fc = null;
+    try {
+      const r2 = await fetch(
+        `/api/farcaster?address=${encodeURIComponent(address)}`,
+        { cache: "no-store" }
+      );
+      const j2 = await r2.json().catch(() => null);
+      if (r2.ok && j2 && j2.ok) {
+        fc = {
+          username: j2.username ?? null,
+          neynarScore: j2.neynarScore ?? null,
+        };
+      }
+    } catch {}
+
     return {
       address,
-      balanceWei: j.balanceWei ?? null,
+      balanceWei: j.balanceWei ?? j.balance ?? null,
       txCount: j.txCount ?? j.totalTx ?? null,
+      farcaster: fc,
       sampleTx: list.map((x) => ({
         timeStamp: x.timeStamp,
         from: x.from,
@@ -57,24 +75,6 @@ async function __fetchExplorerContext(address) {
         value: x.value,
         hash: x.hash,
       })),
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function __fetchFarcasterContext(address) {
-  try {
-    const r = await fetch(`/api/farcaster?address=${encodeURIComponent(address)}`, {
-      cache: "no-store",
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j || !j.ok) return null;
-
-    return {
-      username: j.username ?? null,
-      via: j.via ?? null,
-      cached: !!j.cached,
     };
   } catch {
     return null;
@@ -102,26 +102,8 @@ async function __aiSendNow() {
   __aiMessages.push({ role: "assistant", text: "Thinking..." });
   __aiRender();
 
-  let address = __extractAddress(text);
-
-  // optional fallback: use current detail address if available
-  if (!address && typeof window.__detailAddress === "string") {
-    const v = window.__detailAddress.trim();
-    if (/^0x[a-fA-F0-9]{40}$/.test(v)) address = v;
-  }
-
-  let context = null;
-  if (address) {
-    const explorer = await __fetchExplorerContext(address);
-    const fc = await __fetchFarcasterContext(address);
-
-    if (explorer || fc) {
-      context = {
-        ...(explorer || { address }),
-        farcaster: fc,
-      };
-    }
-  }
+  const address = __extractAddress(text);
+  const context = address ? await __fetchExplorerContext(address) : null;
 
   const history = __aiMessages
     .filter((m) => m.role === "user" || m.role === "assistant")
