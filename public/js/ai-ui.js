@@ -35,39 +35,93 @@ function __extractAddress(text) {
   return m ? m[0] : null;
 }
 
+function __toNum(v) {
+  if (v === null || v === undefined) return NaN;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.trim());
+    return Number.isFinite(n) ? n : NaN;
+  }
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function __formatEthFromWei(wei) {
+  // wei string -> ETH string (simple, safe)
+  const w = String(wei || "").trim();
+  if (!/^\d+$/.test(w)) return null;
+
+  // avoid big-int libs: do manual decimal split
+  // ETH = wei / 1e18
+  const pad = w.padStart(19, "0");
+  const intPart = pad.slice(0, -18).replace(/^0+/, "") || "0";
+  const fracRaw = pad.slice(-18);
+  const frac = fracRaw.replace(/0+$/, "");
+  const out = frac ? `${intPart}.${frac.slice(0, 6)}` : intPart; // max 6 decimals
+  return out;
+}
+
 async function __fetchExplorerContext(address) {
   try {
-    // 1) explorer data
+    // 1) base explorer data
     const r = await fetch(
       `/api/address?address=${encodeURIComponent(address)}&tab=tx`,
       { cache: "no-store" }
     );
     const j = await r.json().catch(() => null);
-    if (!r.ok || !j || j?.error) return null;
+    if (!r.ok || !j || j?.error) return { address };
 
     const list = Array.isArray(j.list) ? j.list.slice(0, 20) : [];
 
-    // 2) farcaster + neynar proxy (API kamu)
-    let fc = null;
+    // normalize txCount
+    const txCount =
+      j.txCount ??
+      j.totalTx ??
+      j.tx_count ??
+      j.transactionCount ??
+      j.result?.txCount ??
+      null;
+
+    // normalize balanceWei (MOST IMPORTANT)
+    const balanceWei =
+      j.balanceWei ??
+      j.balance_wei ??
+      j.result?.balanceWei ??
+      j.result?.balance_wei ??
+      j.balance ??
+      null;
+
+    const balanceEth = balanceWei ? __formatEthFromWei(balanceWei) : null;
+
+    // 2) farcaster (gunakan API kamu: /api/farcaster)
+    let farcasterUsername = null;
+    let neynarScore = null;
+
     try {
       const r2 = await fetch(
         `/api/farcaster?address=${encodeURIComponent(address)}`,
         { cache: "no-store" }
       );
       const j2 = await r2.json().catch(() => null);
+
       if (r2.ok && j2 && j2.ok) {
-        fc = {
-          username: j2.username ?? null,
-          neynarScore: j2.neynarScore ?? null,
-        };
+        farcasterUsername = j2.username || null;
+
+        // score bisa number atau string, normalize jadi number kalau valid
+        const sc = __toNum(j2.neynarScore);
+        neynarScore = Number.isFinite(sc) ? sc : null;
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     return {
       address,
-      balanceWei: j.balanceWei ?? j.balance ?? null,
-      txCount: j.txCount ?? j.totalTx ?? null,
-      farcaster: fc,
+      balanceWei: balanceWei ?? null,
+      balanceEth: balanceEth ?? null,
+      txCount: txCount ?? null,
+      farcasterUsername,
+      neynarScore,
       sampleTx: list.map((x) => ({
         timeStamp: x.timeStamp,
         from: x.from,
@@ -77,7 +131,7 @@ async function __fetchExplorerContext(address) {
       })),
     };
   } catch {
-    return null;
+    return { address };
   }
 }
 
