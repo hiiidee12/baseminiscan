@@ -758,66 +758,34 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   z-index: 1;
 }
 
+/* ===== Top Tabs (safe override) ===== */
 .topTabs{
   display:flex;
-  gap:10px;
-  margin: 10px 0 14px;
+  gap:12px;
+  margin: 12px 0 14px;
+  padding: 0 4px;
 }
-.topTab{
+
+.topTabs .topTab{
   flex:1;
-  border:0;
-  border-radius:999px;
-  padding:10px 12px;
-  font-weight:700;
-  background: rgba(255,255,255,.10);
-  color: rgba(255,255,255,.92);
-}
-.topTab.secondary{
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
   background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.85);
+  color: rgba(255,255,255,.92);
+  font-weight: 800;
+  letter-spacing: .5px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-.aiChat{
-  margin-top:12px;
-  padding: 6px 4px;
-  max-height: 420px;
-  overflow:auto;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
+.topTabs .topTab.secondary{
+  background: rgba(0,0,0,.10);
+  border-color: rgba(255,255,255,.14);
+  color: rgba(255,255,255,.78);
 }
 
-.aiMsg{
-  display:flex;
-}
-.aiMsg.user{
-  justify-content:flex-end;
-}
-.aiMsg.assistant{
-  justify-content:flex-start;
-}
-.aiBubble{
-  max-width: 86%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255,255,255,.08);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.aiMsg.user .aiBubble{
-  background: rgba(60,120,255,.25);
-}
-
-.aiComposer{
-  margin-top:12px;
-  display:flex;
-  gap:10px;
-}
-.aiComposer input{
-  flex:1;
-}
-.aiTip{
-  margin-top:10px;
-  line-height:1.4;
+/* optional: pressed */
+.topTabs .topTab:active{
+  transform: scale(.99);
 }
