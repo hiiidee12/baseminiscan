@@ -101,7 +101,92 @@ function renderTxCount(v) {
   }
   return String(v);
 }
+/* =========================
+   Wallet connection indicator (EIP-1193)
+========================= */
 
+function __setWalletIndicator(connected, account) {
+  const id = "walletIndicator";
+  let el = document.getElementById(id);
+
+  if (!el) {
+    const btn = $("open");
+    if (!btn || !btn.parentNode) return;
+
+    el = document.createElement("div");
+    el.id = id;
+    el.style.marginTop = "10px";
+    el.style.display = "flex";
+    el.style.alignItems = "center";
+    el.style.justifyContent = "center";
+    el.style.gap = "10px";
+    el.style.fontSize = "13px";
+    el.style.opacity = "0.92";
+
+    const dot = document.createElement("span");
+    dot.id = "walletIndicatorDot";
+    dot.style.width = "8px";
+    dot.style.height = "8px";
+    dot.style.borderRadius = "999px";
+    dot.style.display = "inline-block";
+    dot.style.boxShadow = "0 0 14px rgba(0,0,0,.35)";
+
+    const text = document.createElement("span");
+    text.id = "walletIndicatorText";
+
+    el.appendChild(dot);
+    el.appendChild(text);
+
+    btn.parentNode.insertBefore(el, btn.nextSibling);
+  }
+
+  const dot = document.getElementById("walletIndicatorDot");
+  const text = document.getElementById("walletIndicatorText");
+  if (!dot || !text) return;
+
+  if (connected) {
+    dot.style.background = "rgba(46, 213, 115, 1)";
+    text.textContent = account
+      ? `Wallet connected: ${shortHex(account, 6, 4)}`
+      : "Wallet connected";
+  } else {
+    dot.style.background = "rgba(255, 71, 87, 1)";
+    text.textContent = "Wallet not connected";
+  }
+}
+
+async function __checkWalletConnected() {
+  const eth = window.ethereum;
+  if (!eth || !eth.request) {
+    __setWalletIndicator(false, null);
+    return;
+  }
+
+  try {
+    const accounts = await eth.request({ method: "eth_accounts" });
+    const account = accounts?.[0] || null;
+    __setWalletIndicator(!!account, account);
+  } catch (e) {
+    console.log("wallet indicator error", e);
+    __setWalletIndicator(false, null);
+  }
+}
+
+function __initWalletIndicator() {
+  __checkWalletConnected();
+
+  const eth = window.ethereum;
+  if (!eth || !eth.on) return;
+
+  eth.on("accountsChanged", (accounts) => {
+    const account = accounts?.[0] || null;
+    __setWalletIndicator(!!account, account);
+  });
+
+  eth.on("connect", () => __checkWalletConnected());
+  eth.on("disconnect", () => __setWalletIndicator(false, null));
+  eth.on("chainChanged", () => __checkWalletConnected());
+}
 // ============== BARU: USD Formatter & Featured Actions ==============
 
 function fmtUSD(v) {
