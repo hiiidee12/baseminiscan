@@ -1,5 +1,5 @@
 const apiKey = [
-  process.env.NEYNAR_API_KEY_1,
+  process.env.NEYNAR_API_KEY,
   process.env.NEYNAR_API_KEY_2,
 ].filter(Boolean);
 
