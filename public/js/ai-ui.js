@@ -35,27 +35,43 @@ function __extractAddress(text) {
   return m ? m[0] : null;
 }
 
+function __safeTxCount(j) {
+  const v =
+    j?.txCount ??
+    j?.txcount ??
+    j?.totalTx ??
+    j?.totalTxCount ??
+    j?.count ??
+    null;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 async function __fetchExplorerContext(address) {
   try {
     const r = await fetch(
       `/api/address?address=${encodeURIComponent(address)}&tab=tx`,
       { cache: "no-store" }
     );
-    const j = await r.json();
+    const j = await r.json().catch(() => null);
     if (!r.ok || j?.error) return null;
 
-    const list = Array.isArray(j.list) ? j.list.slice(0, 25) : [];
+    const list = Array.isArray(j?.list) ? j.list.slice(0, 25) : [];
 
     return {
       address,
-      balanceWei: j.balanceWei ?? null,
-      txCount: getTxCountValue(j),
+      balanceWei: j?.balanceWei ?? null,
+      txCount: __safeTxCount(j),
       sampleTx: list.map((x) => ({
-        timeStamp: x.timeStamp,
-        from: x.from,
-        to: x.to,
-        value: x.value,
-        hash: x.hash,
+        timeStamp: x?.timeStamp ?? null,
+        from: x?.from ?? null,
+        to: x?.to ?? null,
+        value: x?.value ?? null,
+        hash: x?.hash ?? null,
       })),
     };
   } catch {
@@ -80,8 +96,8 @@ async function __aiSendNow() {
   if (btn) btn.disabled = true;
   input.disabled = true;
 
-  const thinkingIndex = __aiMessages.length;
   __aiMessages.push({ role: "assistant", text: "Thinking..." });
+  const thinkingIndex = __aiMessages.length - 1;
   __aiRender();
 
   const address = __extractAddress(text);
@@ -96,19 +112,15 @@ async function __aiSendNow() {
     const r = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: text,
-        context,
-        history,
-      }),
+      body: JSON.stringify({ message: text, context, history }),
     });
 
-    const j = await r.json();
+    const j = await r.json().catch(() => null);
     if (!r.ok || !j?.ok) throw j;
 
-    __aiMessages[thinkingIndex] = { role: "assistant", text: j.reply || "—" };
+    __aiMessages[thinkingIndex] = { role: "assistant", text: j?.reply || "—" };
     __aiRender();
-  } catch (e) {
+  } catch {
     __aiMessages[thinkingIndex] = {
       role: "assistant",
       text: "Failed to generate. Try again.",
