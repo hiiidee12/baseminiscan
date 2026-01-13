@@ -22,8 +22,7 @@ export default async function handler(req, res) {
       (context && typeof context === "object" && context.address) || null;
 
     if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
-      const farcasterUsername =
-        (context && context.farcasterUsername) || null;
+      const farcasterUsername = (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
         context && context.neynarScore !== undefined ? context.neynarScore : null;
@@ -47,9 +46,16 @@ export default async function handler(req, res) {
 
       // balance priority: balanceEth -> convert from balanceWei -> fallback
       let safeBalance = "Data not available";
-      if (balanceEthRaw) {
+
+      const hasBalanceEth =
+        balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "";
+
+      const hasBalanceWei =
+        balanceWeiRaw !== null && balanceWeiRaw !== undefined && balanceWeiRaw !== "";
+
+      if (hasBalanceEth) {
         safeBalance = `${String(balanceEthRaw)} ETH`;
-      } else if (balanceWeiRaw && /^\d+$/.test(String(balanceWeiRaw))) {
+      } else if (hasBalanceWei && /^\d+$/.test(String(balanceWeiRaw))) {
         // quick wei->eth (6 decimals max)
         const w = String(balanceWeiRaw).trim().padStart(19, "0");
         const intPart = w.slice(0, -18).replace(/^0+/, "") || "0";
@@ -64,34 +70,13 @@ export default async function handler(req, res) {
           ? "Data not available"
           : String(txCountRaw);
 
-      // Farcaster profile link (web + biasanya ke-handle in-app kalau ada)
-      const farcasterProfileUrl =
-        farcasterUsername ? `https://farcaster.xyz/${encodeURIComponent(String(farcasterUsername))}` : null;
-
-      const basescanUrl = `https://basescan.org/address/${encodeURIComponent(
-        String(address)
-      )}`;
-
+      // NOTE: link section removed (as requested)
       const lines = [
         `🧐 Farcaster: ${safeFarcaster}`,
         `🥳 Neynar: ${safeNeynar}`,
         `🤑 Balance: ${safeBalance}`,
         `🤯 Total TX: ${safeTx}`,
-        "",
       ];
-
-      if (farcasterProfileUrl) {
-        lines.push("🔗 Open Farcaster Profile");
-        lines.push(farcasterProfileUrl);
-        lines.push("");
-      } else {
-        lines.push("🔗 Open Farcaster Profile");
-        lines.push("Data not available");
-        lines.push("");
-      }
-
-      lines.push("🌐 Open in Browser");
-      lines.push(basescanUrl);
 
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
@@ -161,3 +146,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
+```0
