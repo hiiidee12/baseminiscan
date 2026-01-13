@@ -16,21 +16,22 @@ function parseRoute() {
   if (parts.length >= 2 && parts[0] === "address") {
     return { page: "detail", address: parts[1] };
   }
+   if (parts.length >= 1 && parts[0] === "ai") {
+  return { page: "ai" };
+   }
   return { page: "home" };
 }
 
 function showPage(page) {
   const home = $("pageHome");
   const detail = $("pageDetail");
-  if (!home || !detail) return;
+  const ai = $("pageAi");
+  if (!home || !detail || !ai) return;
 
   document.body.setAttribute("data-page", page);
 
-  if (page === "detail") {
-    home.style.display = "none";
-    detail.style.display = "block";
-  } else {
-    detail.style.display = "none";
-    home.style.display = "block";
-  }
+  home.style.display = page === "home" ? "block" : "none";
+  detail.style.display = page === "detail" ? "block" : "none";
+  ai.style.display = page === "ai" ? "block" : "none";
+ }
 }
