@@ -5,27 +5,35 @@
 function handleRoute() {
   const r = parseRoute();
 
+  // DETAIL
   if (r.page === "detail" && isAddress(r.address)) {
     loadDetail(r.address, __detailTab || "tx");
     return;
   }
 
+  // AI
   if (r.page === "ai") {
     showPage("ai");
     window.__aiUi?.setActiveTopTab?.("ai");
+
+    // stop gas refresh kalau ada
+    if (typeof stopGasAutoRefresh === "function") stopGasAutoRefresh();
     return;
   }
 
+  // HOME (default)
   showPage("home");
-  startGasAutoRefresh();
-  loadFeaturedActions();
   window.__aiUi?.setActiveTopTab?.("home");
+
+  // start gas + featured
+  if (typeof startGasAutoRefresh === "function") startGasAutoRefresh();
+  if (typeof loadFeaturedActions === "function") loadFeaturedActions();
 }
 
 window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
-  hideLinkRow();
+  if (typeof hideLinkRow === "function") hideLinkRow();
 
   $("open")?.addEventListener("click", () => {
     const q = $("query")?.value?.trim() || "";
@@ -33,9 +41,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (isAddress(q)) {
       setHash(`/address/${q}`);
-    } else {
-      openExternal(makeBaseScanUrl(q));
+      return;
     }
+
+    openExternal(makeBaseScanUrl(q));
   });
 
   $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
@@ -45,9 +54,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") $("open")?.click();
   });
 
-  $("back")?.addEventListener("click", () => {
-    setHash("/");
-  });
+  $("back")?.addEventListener("click", () => setHash("/"));
 
   $("tabTx")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "tx");
