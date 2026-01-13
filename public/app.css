@@ -757,3 +757,67 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   position: relative;
   z-index: 1;
 }
+
+.topTabs{
+  display:flex;
+  gap:10px;
+  margin: 10px 0 14px;
+}
+.topTab{
+  flex:1;
+  border:0;
+  border-radius:999px;
+  padding:10px 12px;
+  font-weight:700;
+  background: rgba(255,255,255,.10);
+  color: rgba(255,255,255,.92);
+}
+.topTab.secondary{
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.85);
+}
+
+.aiChat{
+  margin-top:12px;
+  padding: 6px 4px;
+  max-height: 420px;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.aiMsg{
+  display:flex;
+}
+.aiMsg.user{
+  justify-content:flex-end;
+}
+.aiMsg.assistant{
+  justify-content:flex-start;
+}
+.aiBubble{
+  max-width: 86%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.08);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.aiMsg.user .aiBubble{
+  background: rgba(60,120,255,.25);
+}
+
+.aiComposer{
+  margin-top:12px;
+  display:flex;
+  gap:10px;
+}
+.aiComposer input{
+  flex:1;
+}
+.aiTip{
+  margin-top:10px;
+  line-height:1.4;
+}
