@@ -1,5 +1,5 @@
 const KEYS = [
-  process.env.N_API_KEY_1,
+  process.env.N_API_KEY,
   process.env.N_API_KEY_2,
 ].filter(Boolean);
 
