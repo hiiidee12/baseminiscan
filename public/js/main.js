@@ -6,6 +6,7 @@ function handleRoute() {
   const r = parseRoute();
 
   if (r.page === "detail" && isAddress(r.address)) {
+    if (typeof loadFarcasterUsername === "function") loadFarcasterUsername(r.address);
     loadDetail(r.address, __detailTab || "tx");
     return;
   }
@@ -17,37 +18,50 @@ function handleRoute() {
     return;
   }
 
+  // default: home
   showPage("home");
   window.__aiUi?.setActiveTopTab?.("home");
   if (typeof startGasAutoRefresh === "function") startGasAutoRefresh();
-  if (typeof loadFeaturedActions === "function") loadFeaturedActions();
 }
 
 window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
-  hideLinkRow();
-
-  $("open")?.addEventListener("click", () => {
-    const q = $("query")?.value?.trim() || "";
+  // search submit
+  $("searchForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = $("q")?.value?.trim() || "";
     if (!q) return;
 
+    // route by input type
     if (isAddress(q)) {
-      setHash(`/address/${q}`);
-    } else {
-      openExternal(makeBaseScanUrl(q));
+      location.hash = `#/address/${q}`;
+      return;
     }
+    if (isTx(q)) {
+      // open basescan directly for tx
+      openExternal(makeBaseScanUrl(q));
+      return;
+    }
+    if (isBlock(q)) {
+      openExternal(makeBaseScanUrl(q));
+      return;
+    }
+
+    // fallback: basescan search
+    openExternal(makeBaseScanUrl(q));
   });
 
-  $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
-  $("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
-
-  $("query")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("open")?.click();
+  // top tabs
+  $("tabHomeTop")?.addEventListener("click", () => {
+    location.hash = "#/";
   });
 
-  $("back")?.addEventListener("click", () => setHash("/"));
+  $("tabAiTop")?.addEventListener("click", () => {
+    location.hash = "#/ai";
+  });
 
+  // detail tabs
   $("tabTx")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "tx");
   });
