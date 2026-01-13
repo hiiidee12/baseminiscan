@@ -7,26 +7,26 @@
 
   <meta property="og:title" content="Base Mini Scan" />
   <meta property="og:description" content="Quick BaseScan lookup on Base Network." />
-  <meta property="og:image" content="https://baseminiscan.vercel.app/assets/spx.png " />
-  <meta property="og:url" content="https://baseminiscan.vercel.app/ " />
+  <meta property="og:image" content="https://baseminiscan.vercel.app/assets/spx.png" />
+  <meta property="og:url" content="https://baseminiscan.vercel.app/" />
   <meta property="og:type" content="website" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Base Mini Scan" />
   <meta name="twitter:description" content="Base Network explorer helper" />
-  <meta name="twitter:image" content="https://baseminiscan.vercel.app/assets/spx.png " />
+  <meta name="twitter:image" content="https://baseminiscan.vercel.app/assets/spx.png" />
 
   <link rel="stylesheet" href="/app.css" />
 </head>
 
 <body>
- 
-   <div class="wrap" id="wrap">
+  <div class="wrap" id="wrap">
     <div class="card">
       <div class="topTabs">
-      <button id="tabHomeTop" class="topTab">HOME</button>
-      <button id="tabAiTop" class="topTab secondary">AI MODE</button>
-    </div>
+        <button id="tabHomeTop" class="topTab">HOME</button>
+        <button id="tabAiTop" class="topTab secondary">AI MODE</button>
+      </div>
+
       <!-- Profile header -->
       <div class="profile profileCard">
         <img id="pfp" class="pfp" alt="pfp" />
@@ -53,41 +53,35 @@
           <button id="open">Open</button>
         </div>
 
-        <!-- Gas tracker area (home only) -->
         <div class="sectionHead">
           <div class="sectionTitle">Base Gas Tracker ⛽</div>
           <div class="muted gasNext" id="gasNext">Next update in <b>—</b></div>
         </div>
 
         <div id="gasOutput"></div>
-        
         <div id="featuredActions" class="featuredCard"></div>
-
         <div id="additionalInfo"></div>
-
       </section>
 
-      <!-- AI MODE PAGE -->
-<section id="pageAi" data-page="ai" style="display:none">
-  <div class="card">
-    <div class="cardTitle">AI Mode</div>
+      <!-- ============= AI MODE PAGE ============= -->
+      <section id="pageAi" data-page="ai" style="display:none">
+        <div class="cardTitle">AI Mode</div>
 
-    <div id="aiChat" class="aiChat"></div>
+        <div id="aiChat" class="aiChat"></div>
 
-    <div class="aiComposer">
-      <input
-        id="aiInput"
-        type="text"
-        placeholder="Paste address + ask something…"
-        autocomplete="off"
-      />
-      <button id="aiSend">Send</button>
-    </div>
-  </div>
-</section>
+        <div class="aiComposer">
+          <input
+            id="aiInput"
+            type="text"
+            placeholder="Paste address + ask something…"
+            autocomplete="off"
+          />
+          <button id="aiSend">Send</button>
+        </div>
+      </section>
+
       <!-- ============= DETAIL PAGE ============= -->
       <section id="pageDetail" data-page="detail" style="display:none">
-        <!-- Floating top bar -->
         <div class="detailBar">
           <button id="back" class="secondary backBtn">← Back</button>
           <div class="muted" id="link"></div>
@@ -121,24 +115,22 @@
         </div>
 
         <div id="detailOutput"></div>
-
       </section>
-
     </div>
   </div>
 
   <script type="module" src="/sdk.js"></script>
 
-<script src="./js/utils.js"></script>
-<script src="./js/featuredActions.js"></script>
-<script src="./js/overviewState.js"></script>
-<script src="./js/router.js"></script>
-<script src="./js/tabs.js"></script>
-<script src="./js/skeletons.js"></script>
-<script src="./js/renderers.js"></script>
-<script src="./js/detail.js"></script>
-<script src="./js/gas.js"></script>
-<script src="./js/ai-ui.js"></script>
-<script src="./js/main.js"></script>
+  <script src="./js/utils.js"></script>
+  <script src="./js/featuredActions.js"></script>
+  <script src="./js/overviewState.js"></script>
+  <script src="./js/router.js"></script>
+  <script src="./js/tabs.js"></script>
+  <script src="./js/skeletons.js"></script>
+  <script src="./js/renderers.js"></script>
+  <script src="./js/detail.js"></script>
+  <script src="./js/gas.js"></script>
+  <script src="./js/ai-ui.js"></script>
+  <script src="./js/main.js"></script>
 </body>
 </html>
