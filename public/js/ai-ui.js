@@ -35,93 +35,42 @@ function __extractAddress(text) {
   return m ? m[0] : null;
 }
 
-function __toNum(v) {
-  if (v === null || v === undefined) return NaN;
-  if (typeof v === "number") return v;
-  if (typeof v === "string") {
-    const n = parseFloat(v.trim());
-    return Number.isFinite(n) ? n : NaN;
-  }
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
+function __pickBalanceWei(j) {
+  return j?.balanceWei ?? j?.balance ?? j?.result?.balanceWei ?? j?.result?.balance ?? null;
 }
 
-function __formatEthFromWei(wei) {
-  // wei string -> ETH string (simple, safe)
-  const w = String(wei || "").trim();
-  if (!/^\d+$/.test(w)) return null;
-
-  // avoid big-int libs: do manual decimal split
-  // ETH = wei / 1e18
-  const pad = w.padStart(19, "0");
-  const intPart = pad.slice(0, -18).replace(/^0+/, "") || "0";
-  const fracRaw = pad.slice(-18);
-  const frac = fracRaw.replace(/0+$/, "");
-  const out = frac ? `${intPart}.${frac.slice(0, 6)}` : intPart; // max 6 decimals
-  return out;
+function __pickTxCount(j) {
+  return j?.txCount ?? j?.totalTx ?? j?.result?.txCount ?? j?.result?.totalTx ?? null;
 }
 
 async function __fetchExplorerContext(address) {
   try {
-    // 1) base explorer data
-    const r = await fetch(
-      `/api/address?address=${encodeURIComponent(address)}&tab=tx`,
-      { cache: "no-store" }
-    );
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j || j?.error) return { address };
+    const [addrRes, fcRes] = await Promise.allSettled([
+      fetch(`/api/address?address=${encodeURIComponent(address)}&tab=tx`, { cache: "no-store" }),
+      fetch(`/api/farcaster?address=${encodeURIComponent(address)}`, { cache: "no-store" }),
+    ]);
 
-    const list = Array.isArray(j.list) ? j.list.slice(0, 20) : [];
-
-    // normalize txCount
-    const txCount =
-      j.txCount ??
-      j.totalTx ??
-      j.tx_count ??
-      j.transactionCount ??
-      j.result?.txCount ??
-      null;
-
-    // normalize balanceWei (MOST IMPORTANT)
-    const balanceWei =
-      j.balanceWei ??
-      j.balance_wei ??
-      j.result?.balanceWei ??
-      j.result?.balance_wei ??
-      j.balance ??
-      null;
-
-    const balanceEth = balanceWei ? __formatEthFromWei(balanceWei) : null;
-
-    // 2) farcaster (gunakan API kamu: /api/farcaster)
-    let farcasterUsername = null;
-    let neynarScore = null;
-
-    try {
-      const r2 = await fetch(
-        `/api/farcaster?address=${encodeURIComponent(address)}`,
-        { cache: "no-store" }
-      );
-      const j2 = await r2.json().catch(() => null);
-
-      if (r2.ok && j2 && j2.ok) {
-        farcasterUsername = j2.username || null;
-
-        // score bisa number atau string, normalize jadi number kalau valid
-        const sc = __toNum(j2.neynarScore);
-        neynarScore = Number.isFinite(sc) ? sc : null;
-      }
-    } catch {
-      // ignore
+    let addrJson = null;
+    if (addrRes.status === "fulfilled") {
+      addrJson = await addrRes.value.json().catch(() => null);
+      if (!addrRes.value.ok) addrJson = null;
+      if (addrJson?.error) addrJson = null;
     }
+
+    let fcJson = null;
+    if (fcRes.status === "fulfilled") {
+      fcJson = await fcRes.value.json().catch(() => null);
+      if (!fcRes.value.ok) fcJson = null;
+      if (fcJson && fcJson.ok !== true) fcJson = null;
+    }
+
+    const list = Array.isArray(addrJson?.list) ? addrJson.list.slice(0, 20) : [];
 
     return {
       address,
-      balanceWei: balanceWei ?? null,
-      balanceEth: balanceEth ?? null,
-      txCount: txCount ?? null,
-      farcasterUsername,
-      neynarScore,
+      // explorer
+      balanceWei: __pickBalanceWei(addrJson),
+      txCount: __pickTxCount(addrJson),
       sampleTx: list.map((x) => ({
         timeStamp: x.timeStamp,
         from: x.from,
@@ -129,6 +78,9 @@ async function __fetchExplorerContext(address) {
         value: x.value,
         hash: x.hash,
       })),
+      // farcaster (from /api/farcaster)
+      farcasterUsername: fcJson?.username ?? null,
+      neynarScore: fcJson?.neynarScore ?? null,
     };
   } catch {
     return { address };
@@ -168,11 +120,7 @@ async function __aiSendNow() {
     const r = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: text,
-        context,
-        history,
-      }),
+      body: JSON.stringify({ message: text, context, history }),
     });
 
     const j = await r.json().catch(() => null);
@@ -180,7 +128,7 @@ async function __aiSendNow() {
 
     __aiMessages[thinkingIndex] = {
       role: "assistant",
-      text: (j.reply || "—").trim(),
+      text: String(j.reply || "Data not available.").trim(),
     };
     __aiRender();
   } catch {
