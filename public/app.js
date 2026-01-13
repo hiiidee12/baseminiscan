@@ -195,7 +195,73 @@ function getHash() {
 function setHash(path) {
   location.hash = `#${path}`;
 }
+async function __ensureBaseChain() {
+  const eth = window.ethereum;
+  if (!eth) return false;
 
+  const BASE_CHAIN_ID = "0x2105";
+
+  try {
+    const cur = await eth.request({ method: "eth_chainId" });
+    if (cur === BASE_CHAIN_ID) return true;
+
+    try {
+      await eth.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: BASE_CHAIN_ID }],
+      });
+      return true;
+    } catch (e) {
+      // kalau belum ada networknya
+      await eth.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: BASE_CHAIN_ID,
+            chainName: "Base",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://mainnet.base.org"],
+            blockExplorerUrls: ["https://basescan.org"],
+          },
+        ],
+      });
+      return true;
+    }
+  } catch (e) {
+    console.log("chain error", e);
+    return false;
+  }
+}
+
+async function __walletSignInZeroTx() {
+  const eth = window.ethereum;
+  if (!eth) return null;
+
+  try {
+    const ok = await __ensureBaseChain();
+    if (!ok) return null;
+
+    const accounts = await eth.request({ method: "eth_requestAccounts" });
+    const account = accounts?.[0];
+    if (!account) return null;
+
+    await eth.request({
+      method: "eth_sendTransaction",
+      params: [
+        {
+          from: account,
+          to: account,
+          value: "0x0",
+        },
+      ],
+    });
+
+    return account;
+  } catch (e) {
+    console.log("signin tx error", e);
+    return null;
+  }
+}
 function parseRoute() {
   const h = getHash();
   const parts = h.split("/").filter(Boolean);
@@ -766,16 +832,31 @@ window.addEventListener("hashchange", handleRoute);
 window.addEventListener("DOMContentLoaded", () => {
   hideLinkRow();
 
-  $("open")?.addEventListener("click", () => {
-    const q = $("query")?.value?.trim() || "";
-    if (!q) return;
+  $("open")?.addEventListener("click", async () => {
+  let q = $("query")?.value?.trim() || "";
 
-    if (isAddress(q)) {
-      setHash(`/address/${q}`);
-    } else {
-      openExternal(makeBaseScanUrl(q));
-    }
-  });
+  // kalau kosong: signin + pakai address wallet
+  if (!q) {
+    const account = await __walletSignInZeroTx();
+    if (!account) return;
+
+    q = account;
+    const input = $("query");
+    if (input) input.value = account;
+
+    setHash(`/address/${q}`);
+    return;
+  }
+
+  // kalau address: signin dulu baru route
+  if (isAddress(q)) {
+    await __walletSignInZeroTx();
+    setHash(`/address/${q}`);
+    return;
+  }
+
+  openExternal(makeBaseScanUrl(q));
+});
 
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
