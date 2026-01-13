@@ -13,11 +13,14 @@ function ageFromTs(ts) {
 }
 
 async function loadFarcasterUsername(address) {
-  if (window.__lastFarcasterAddress === address) return;
-  window.__lastFarcasterAddress = address;
-
   const elDetail = document.getElementById("fcUserDetail");
   const elHome = document.getElementById("fcUser");
+
+  // jangan "ngunci" address kalau elemen belum ada
+  if (!elDetail && !elHome) return;
+
+  if (window.__lastFarcasterAddress === address) return;
+  window.__lastFarcasterAddress = address;
 
   if (elDetail) elDetail.textContent = "-";
   if (elHome) elHome.textContent = "@-";
