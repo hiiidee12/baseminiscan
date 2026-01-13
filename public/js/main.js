@@ -6,7 +6,6 @@ function handleRoute() {
   const r = parseRoute();
 
   if (r.page === "detail" && isAddress(r.address)) {
-    if (typeof loadFarcasterUsername === "function") loadFarcasterUsername(r.address);
     loadDetail(r.address, __detailTab || "tx");
     return;
   }
@@ -18,50 +17,37 @@ function handleRoute() {
     return;
   }
 
-  // default: home
   showPage("home");
   window.__aiUi?.setActiveTopTab?.("home");
   if (typeof startGasAutoRefresh === "function") startGasAutoRefresh();
+  if (typeof loadFeaturedActions === "function") loadFeaturedActions();
 }
 
 window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
-  // search submit
-  $("searchForm")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const q = $("q")?.value?.trim() || "";
+  hideLinkRow();
+
+  $("open")?.addEventListener("click", () => {
+    const q = $("query")?.value?.trim() || "";
     if (!q) return;
 
-    // route by input type
     if (isAddress(q)) {
-      location.hash = `#/address/${q}`;
-      return;
-    }
-    if (isTx(q)) {
-      // open basescan directly for tx
+      setHash(`/address/${q}`);
+    } else {
       openExternal(makeBaseScanUrl(q));
-      return;
     }
-    if (isBlock(q)) {
-      openExternal(makeBaseScanUrl(q));
-      return;
-    }
-
-    // fallback: basescan search
-    openExternal(makeBaseScanUrl(q));
   });
 
-  // top tabs
-  $("tabHomeTop")?.addEventListener("click", () => {
-    location.hash = "#/";
+  $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
+  $("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
+
+  $("query")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("open")?.click();
   });
 
-  $("tabAiTop")?.addEventListener("click", () => {
-    location.hash = "#/ai";
-  });
+  $("back")?.addEventListener("click", () => setHash("/"));
 
-  // detail tabs
   $("tabTx")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "tx");
   });
