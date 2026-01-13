@@ -17,12 +17,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // ====== deterministic scan output (no halu) ======
+    // ===== deterministic scan output =====
     const address =
       (context && typeof context === "object" && context.address) || null;
 
     if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
-      const farcasterUsername = (context && context.farcasterUsername) || null;
+      const farcasterUsername =
+        (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
         context && context.neynarScore !== undefined ? context.neynarScore : null;
@@ -44,25 +45,21 @@ export default async function handler(req, res) {
           ? "Data not available"
           : String(neynarScoreRaw);
 
-      // balance priority: balanceEth -> convert from balanceWei -> fallback
+      // balance priority: balanceEth -> convert from balanceWei
       let safeBalance = "Data not available";
-
-      const hasBalanceEth =
-        balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "";
-
-      const hasBalanceWei =
-        balanceWeiRaw !== null && balanceWeiRaw !== undefined && balanceWeiRaw !== "";
-
-      if (hasBalanceEth) {
+      if (balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "") {
         safeBalance = `${String(balanceEthRaw)} ETH`;
-      } else if (hasBalanceWei && /^\d+$/.test(String(balanceWeiRaw))) {
-        // quick wei->eth (6 decimals max)
-        const w = String(balanceWeiRaw).trim().padStart(19, "0");
-        const intPart = w.slice(0, -18).replace(/^0+/, "") || "0";
-        const fracRaw = w.slice(-18);
-        const frac = fracRaw.replace(/0+$/, "");
-        const out = frac ? `${intPart}.${frac.slice(0, 6)}` : intPart;
-        safeBalance = `${out} ETH`;
+      } else if (balanceWeiRaw !== null && balanceWeiRaw !== undefined) {
+        try {
+          const w = BigInt(String(balanceWeiRaw));
+          const base = 10n ** 18n;
+          const intPart = w / base;
+          const fracPart = w % base;
+          const frac6 = (fracPart / 10n ** 12n).toString().padStart(6, "0");
+          safeBalance = `${intPart.toString()}.${frac6} ETH`;
+        } catch {
+          // ignore
+        }
       }
 
       const safeTx =
@@ -70,7 +67,6 @@ export default async function handler(req, res) {
           ? "Data not available"
           : String(txCountRaw);
 
-      // NOTE: link section removed (as requested)
       const lines = [
         `🧐 Farcaster: ${safeFarcaster}`,
         `🥳 Neynar: ${safeNeynar}`,
@@ -81,12 +77,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ====== fallback Gemini for non-scan questions ======
+    // ===== fallback Gemini for non-scan questions =====
     if (!apiKey) {
-      return res.status(200).json({
-        ok: true,
-        reply: "Data not available.",
-      });
+      return res.status(200).json({ ok: true, reply: "Data not available." });
     }
 
     const safeMessage = message.slice(0, 3000);
@@ -101,9 +94,7 @@ export default async function handler(req, res) {
       "Respond in clean, simple English. " +
       "Do not invent data. If data is missing, say: Data not available.";
 
-    const userPrompt =
-      `User message:\n${safeMessage}\n\n` +
-      "Rules:\n- Short answer\n- No hype";
+    const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
 
     const contents = [
       ...trimmedHistory,
@@ -146,4 +137,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
-```0
