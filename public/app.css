@@ -757,35 +757,3 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   position: relative;
   z-index: 1;
 }
-
-/* ===== Top Tabs (safe override) ===== */
-.topTabs{
-  display:flex;
-  gap:12px;
-  margin: 12px 0 14px;
-  padding: 0 4px;
-}
-
-.topTabs .topTab{
-  flex:1;
-  height: 44px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.92);
-  font-weight: 800;
-  letter-spacing: .5px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.topTabs .topTab.secondary{
-  background: rgba(0,0,0,.10);
-  border-color: rgba(255,255,255,.14);
-  color: rgba(255,255,255,.78);
-}
-
-/* optional: pressed */
-.topTabs .topTab:active{
-  transform: scale(.99);
-}
