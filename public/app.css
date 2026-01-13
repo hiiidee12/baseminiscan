@@ -824,3 +824,8 @@ body[data-page="detail"] .topTabs{
 .aiComposer input {
   flex: 1;
 }
+
+/* Hide profile card in AI mode */
+body[data-page="ai"] .profileCard {
+  display: none;
+}
