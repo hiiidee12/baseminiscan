@@ -63,6 +63,24 @@ async function __fetchExplorerContext(address) {
   }
 }
 
+async function __fetchFarcasterContext(address) {
+  try {
+    const r = await fetch(`/api/farcaster?address=${encodeURIComponent(address)}`, {
+      cache: "no-store",
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.ok) return null;
+
+    return {
+      username: j.username ?? null,
+      via: j.via ?? null,
+      cached: !!j.cached,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function __aiSendNow() {
   if (__aiBusy) return;
 
@@ -84,8 +102,26 @@ async function __aiSendNow() {
   __aiMessages.push({ role: "assistant", text: "Thinking..." });
   __aiRender();
 
-  const address = __extractAddress(text);
-  const context = address ? await __fetchExplorerContext(address) : null;
+  let address = __extractAddress(text);
+
+  // optional fallback: use current detail address if available
+  if (!address && typeof window.__detailAddress === "string") {
+    const v = window.__detailAddress.trim();
+    if (/^0x[a-fA-F0-9]{40}$/.test(v)) address = v;
+  }
+
+  let context = null;
+  if (address) {
+    const explorer = await __fetchExplorerContext(address);
+    const fc = await __fetchFarcasterContext(address);
+
+    if (explorer || fc) {
+      context = {
+        ...(explorer || { address }),
+        farcaster: fc,
+      };
+    }
+  }
 
   const history = __aiMessages
     .filter((m) => m.role === "user" || m.role === "assistant")
