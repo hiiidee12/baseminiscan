@@ -67,6 +67,24 @@
 
       </section>
 
+      <!-- AI MODE PAGE -->
+<section id="pageAi" data-page="ai" style="display:none">
+  <div class="card">
+    <div class="cardTitle">AI Mode</div>
+
+    <div id="aiChat" class="aiChat"></div>
+
+    <div class="aiComposer">
+      <input
+        id="aiInput"
+        type="text"
+        placeholder="Paste address + ask something…"
+        autocomplete="off"
+      />
+      <button id="aiSend">Send</button>
+    </div>
+  </div>
+</section>
       <!-- ============= DETAIL PAGE ============= -->
       <section id="pageDetail" data-page="detail" style="display:none">
         <!-- Floating top bar -->
@@ -120,6 +138,7 @@
 <script src="./js/renderers.js"></script>
 <script src="./js/detail.js"></script>
 <script src="./js/gas.js"></script>
+<script src="./js/ai-ui.js"></script>
 <script src="./js/main.js"></script>
 </body>
 </html>
