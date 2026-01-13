@@ -4,36 +4,20 @@
 
 function handleRoute() {
   const r = parseRoute();
-
-  // DETAIL
   if (r.page === "detail" && isAddress(r.address)) {
     loadDetail(r.address, __detailTab || "tx");
-    return;
+  } else {
+    showPage("home");
+    startGasAutoRefresh();
+    // 
+    loadFeaturedActions();
   }
-
-  // AI
-  if (r.page === "ai") {
-    showPage("ai");
-    window.__aiUi?.setActiveTopTab?.("ai");
-
-    // stop gas refresh kalau ada
-    if (typeof stopGasAutoRefresh === "function") stopGasAutoRefresh();
-    return;
-  }
-
-  // HOME (default)
-  showPage("home");
-  window.__aiUi?.setActiveTopTab?.("home");
-
-  // start gas + featured
-  if (typeof startGasAutoRefresh === "function") startGasAutoRefresh();
-  if (typeof loadFeaturedActions === "function") loadFeaturedActions();
 }
 
 window.addEventListener("hashchange", handleRoute);
 
 window.addEventListener("DOMContentLoaded", () => {
-  if (typeof hideLinkRow === "function") hideLinkRow();
+  hideLinkRow();
 
   $("open")?.addEventListener("click", () => {
     const q = $("query")?.value?.trim() || "";
@@ -41,20 +25,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (isAddress(q)) {
       setHash(`/address/${q}`);
-      return;
+    } else {
+      openExternal(makeBaseScanUrl(q));
     }
-
-    openExternal(makeBaseScanUrl(q));
   });
-
-  $("tabHomeTop")?.addEventListener("click", () => setHash("/"));
-  $("tabAiTop")?.addEventListener("click", () => setHash("/ai"));
 
   $("query")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("open")?.click();
   });
 
-  $("back")?.addEventListener("click", () => setHash("/"));
+  $("back")?.addEventListener("click", () => {
+    setHash("/");
+  });
 
   $("tabTx")?.addEventListener("click", () => {
     if (__detailAddress) loadDetail(__detailAddress, "tx");
