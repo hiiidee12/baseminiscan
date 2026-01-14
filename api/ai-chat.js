@@ -17,18 +17,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // ===== scan trigger: ONLY if we can find an ETH address (context OR message) =====
-    const ctxAddress =
-      context && typeof context === "object" ? String(context.address || "").trim() : "";
-
-    const msgMatch = message.match(/0x[a-fA-F0-9]{40}/);
-    const msgAddress = msgMatch ? msgMatch[0] : "";
-
-    const scanAddress = /^0x[a-fA-F0-9]{40}$/.test(ctxAddress)
-      ? ctxAddress
-      : /^0x[a-fA-F0-9]{40}$/.test(msgAddress)
-      ? msgAddress
-      : null;
+    // ===== scan trigger: ONLY if message contains an ETH address =====
+    const m = message.match(/0x[a-fA-F0-9]{40}/);
+    const scanAddress = m ? m[0] : null;
 
     if (scanAddress) {
       const farcasterUsername = (context && context.farcasterUsername) || null;
@@ -82,31 +73,33 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ===== chat (ALL normal conversation goes to Gemini) =====
+    // ===== chat: ALWAYS through Gemini =====
     if (!apiKey) {
-      return res.status(200).json({ ok: true, reply: "Data not available." });
+      return res.status(200).json({ ok: true, reply: "Chat service unavailable." });
     }
-
-    const trimmedHistory = history.slice(-10).map((m) => ({
-      role: m?.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m?.text || "").slice(0, 2000) }],
-    }));
 
     const systemText =
       "You are an assistant inside a Base blockchain explorer mini app. " +
-      "Chat normally. Reply in the user's language (Indonesian or English). " +
+      "Chat normally (casual conversation allowed). " +
+      "Reply in the user's language (Indonesian or English). " +
       "Do not invent on-chain data. If on-chain data is missing, say: Data not available.";
 
+    const mappedHistory = history.map((m) => ({
+      role: m?.role === "assistant" || m?.role === "model" ? "model" : "user",
+      parts: [{ text: String(m?.text || "") }],
+    }));
+
     const contents = [
-      ...trimmedHistory,
+      ...mappedHistory,
       { role: "user", parts: [{ text: `${systemText}\n\n${message}` }] },
     ];
 
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+    async function callGemini() {
+      const r = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -116,21 +109,28 @@ export default async function handler(req, res) {
           contents,
           generationConfig: { temperature: 0.6, maxOutputTokens: 350 },
         }),
-      }
-    );
+      });
 
-    const j = await r.json().catch(() => null);
+      const j = await r.json().catch(() => null);
+      return { r, j };
+    }
+
+    // 1x retry on failure
+    let { r, j } = await callGemini();
+    if (!r.ok) {
+      ({ r, j } = await callGemini());
+    }
 
     if (!r.ok) {
-      return res.status(200).json({ ok: true, reply: "Data not available." });
+      return res.status(200).json({ ok: true, reply: "Chat service unavailable." });
     }
 
     const reply =
       j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
-      "Data not available.";
+      "Chat service unavailable.";
 
     return res.status(200).json({ ok: true, reply });
   } catch {
-    return res.status(200).json({ ok: true, reply: "Data not available." });
+    return res.status(200).json({ ok: true, reply: "Chat service unavailable." });
   }
 }
