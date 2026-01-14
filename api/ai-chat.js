@@ -19,7 +19,7 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
 
   let last = { ok: false, status: 0, json: null };
 
-  // coba maksimal sebanyak jumlah key
+  // 
   for (let attempt = 0; attempt < GEMINI_KEYS.length; attempt++) {
     const apiKey = pickGeminiKey();
 
@@ -37,16 +37,16 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
 
     const j = await r.json().catch(() => null);
 
-    // sukses
+    // 
     if (r.ok) return { ok: true, status: r.status, json: j };
 
-    // hanya rotate kalau rate limit / quota / temporary
+    // 
     if (r.status === 429 || r.status === 503) {
       last = { ok: false, status: r.status, json: j };
       continue;
     }
 
-    // error lain: jangan lanjut rotate (biasanya key salah / forbidden)
+    // 
     return { ok: false, status: r.status, json: j };
   }
 
