@@ -38,25 +38,49 @@ async function fetchWithKey(address, key) {
 }
 
 function pickFirstUser(payload, address) {
-  const usersMap = payload?.users;
-  if (!usersMap) return null;
+  // Neynar bisa balikin map langsung { "<address>": [...] } atau dibungkus { users: { ... } }
+  const usersMap =
+    (payload && typeof payload === "object" && payload.users) ? payload.users :
+    (payload && typeof payload === "object" ? payload : null);
 
-  const users = usersMap[address];
+  if (!usersMap || typeof usersMap !== "object") return null;
+
+  // Cari key address tanpa bergantung casing (kadang Neynar balikin checksum)
+  const addrLower = String(address || "").toLowerCase();
+
+  let users =
+    usersMap[address] ||
+    usersMap[addrLower] ||
+    usersMap[String(address || "").toUpperCase()] ||
+    null;
+
+  if (!users) {
+    for (const k of Object.keys(usersMap)) {
+      if (String(k).toLowerCase() === addrLower) {
+        users = usersMap[k];
+        break;
+      }
+    }
+  }
+
   if (!users) return null;
 
   const item = Array.isArray(users) ? users[0] : users;
   const u = item?.user || item;
-  if (!u) return null;
+  if (!u || typeof u !== "object") return null;
 
-  return {
-    username: u.username || null,
-    neynarScore:
-      u.neynar_score ??
-      u.score ??
-      u.scores?.neynar ??
-      u.experimental?.neynar_score ??
-      null,
-  };
+  const username = u.username || null;
+
+  const neynarScore =
+    (typeof u.neynar_score === "number" ? u.neynar_score : null) ??
+    (typeof u.score === "number" ? u.score : null) ??
+    (u.scores && typeof u.scores.neynar === "number" ? u.scores.neynar : null) ??
+    (u.experimental && typeof u.experimental.neynar_score === "number"
+      ? u.experimental.neynar_score
+      : null) ??
+    null;
+
+  return { username, neynarScore };
 }
 
 async function lookupAddress(address) {
@@ -83,7 +107,6 @@ async function lookupAddress(address) {
       const data = await fetchWithKey(address, key);
       const picked = pickFirstUser(data, address);
 
-      // ❗ jangan cache hasil kosong
       if (!picked || !picked.username) continue;
 
       const via = i === 0 ? "primary" : "backup";
@@ -110,7 +133,6 @@ async function lookupAddress(address) {
     }
   }
 
-  // ❗ fallback TANPA cache
   return {
     ok: true,
     cached: false,
