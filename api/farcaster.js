@@ -38,15 +38,15 @@ async function fetchWithKey(address, key) {
 }
 
 function pickFirstUser(payload, address) {
-  if (!payload || typeof payload !== 'object') return null;
+  if (!payload || typeof payload !== "object") return null;
 
   const usersMap = payload.users;
-  if (!usersMap || typeof usersMap !== 'object') return null;
+  if (!usersMap || typeof usersMap !== "object") return null;
 
   // Alamat sudah dinormalisasi ke lowercase
   const users = usersMap[address];
   const u = Array.isArray(users) ? users[0] : users;
-  if (!u || typeof u !== 'object') return null;
+  if (!u || typeof u !== "object") return null;
 
   const username = u.username || null;
 
@@ -64,6 +64,8 @@ function pickFirstUser(payload, address) {
 }
 
 async function lookupAddress(address) {
+  const keysCount = KEYS.length;
+
   // Cek cache dulu
   const cached = CACHE.get(address);
   if (cached && Date.now() - cached.ts < TTL) {
@@ -73,6 +75,7 @@ async function lookupAddress(address) {
       username: cached.username ?? null,
       neynarScore: cached.neynarScore ?? null,
       via: cached.via,
+      keysCount,
     };
   }
 
@@ -85,7 +88,7 @@ async function lookupAddress(address) {
       const data = await fetchWithKey(address, key);
       const picked = pickFirstUser(data, address);
 
-      if (!picked) continue; // Tidak ada user ditemukan — coba key berikutnya?
+      if (!picked) continue;
 
       const via = i === 0 ? "primary" : "backup";
       const result = {
@@ -94,6 +97,7 @@ async function lookupAddress(address) {
         username: picked.username,
         neynarScore: picked.neynarScore,
         via,
+        keysCount,
       };
 
       // Simpan ke cache
@@ -106,7 +110,6 @@ async function lookupAddress(address) {
 
       return result;
     } catch (err) {
-      // Abaikan error dan coba key berikutnya
       console.warn(`API key ${i + 1} failed for ${address}:`, err.message);
     }
   }
@@ -118,6 +121,7 @@ async function lookupAddress(address) {
     username: null,
     neynarScore: null,
     via: "none",
+    keysCount,
   };
 
   CACHE.set(address, {
@@ -138,7 +142,11 @@ export default async function handler(req, res) {
 
   // Validasi format alamat Ethereum
   if (!/^0x[a-f0-9]{40}$/.test(address)) {
-    return res.status(400).json({ ok: false, error: "Invalid address" });
+    return res.status(400).json({
+      ok: false,
+      error: "Invalid address",
+      keysCount: KEYS.length,
+    });
   }
 
   // Deduplikasi permintaan sedang berjalan
@@ -161,7 +169,11 @@ export default async function handler(req, res) {
     res.status(200).json(result);
   } catch (err) {
     console.error("Unexpected error in handler:", err);
-    res.status(500).json({ ok: false, error: "Internal server error" });
+    res.status(500).json({
+      ok: false,
+      error: "Internal server error",
+      keysCount: KEYS.length,
+    });
   } finally {
     IN_FLIGHT.delete(address);
   }
