@@ -17,13 +17,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // ===== deterministic scan output =====
+    const safeMessage = message.slice(0, 3000);
+
     const address =
       (context && typeof context === "object" && context.address) || null;
 
     if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
-      const farcasterUsername =
-        (context && context.farcasterUsername) || null;
+      const farcasterUsername = (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
         context && context.neynarScore !== undefined ? context.neynarScore : null;
@@ -45,7 +45,6 @@ export default async function handler(req, res) {
           ? "Data not available"
           : String(neynarScoreRaw);
 
-      // balance priority: balanceEth -> convert from balanceWei
       let safeBalance = "Data not available";
       if (balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "") {
         safeBalance = `${String(balanceEthRaw)} ETH`;
@@ -57,9 +56,7 @@ export default async function handler(req, res) {
           const fracPart = w % base;
           const frac6 = (fracPart / 10n ** 12n).toString().padStart(6, "0");
           safeBalance = `${intPart.toString()}.${frac6} ETH`;
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
 
       const safeTx =
@@ -77,12 +74,24 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ===== fallback Gemini for non-scan questions =====
     if (!apiKey) {
-      return res.status(200).json({ ok: true, reply: "Data not available." });
-    }
+      const t = safeMessage.toLowerCase();
 
-    const safeMessage = message.slice(0, 3000);
+      if (/(^|\s)(thanks|thx|makasih|terima kasih)(\s|$)/i.test(t)) {
+        return res.status(200).json({ ok: true, reply: "You're welcome." });
+      }
+      if (/(^|\s)(nice|mantap|nais|naisu|keren|sip)(\s|$)/i.test(t)) {
+        return res.status(200).json({ ok: true, reply: "Glad it helps." });
+      }
+      if (/(^|\s)(ok|oke|okay)(\s|$)/i.test(t)) {
+        return res.status(200).json({ ok: true, reply: "👍" });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        reply: "Paste an address (0x...) to scan, or ask a question.",
+      });
+    }
 
     const trimmedHistory = history.slice(-8).map((m) => ({
       role: m?.role === "assistant" ? "model" : "user",
@@ -121,9 +130,7 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => null);
 
     if (!r.ok) {
-      return res
-        .status(r.status)
-        .json({ ok: false, error: "Gemini error", detail: j });
+      return res.status(200).json({ ok: true, reply: "Data not available." });
     }
 
     const reply =
@@ -134,6 +141,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, reply });
   } catch {
-    return res.status(500).json({ ok: false, error: "Server error" });
+    return res.status(200).json({ ok: true, reply: "Data not available." });
   }
 }
