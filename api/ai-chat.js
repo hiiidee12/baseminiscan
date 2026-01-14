@@ -17,10 +17,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    const msgIsEthAddress = /^0x[a-fA-F0-9]{40}$/.test(message);
+    // ===== scan trigger: ONLY if we can find an ETH address (context OR message) =====
+    const ctxAddress =
+      context && typeof context === "object" ? String(context.address || "").trim() : "";
 
-    // ===== deterministic scan output (ONLY when message is an ETH address) =====
-    if (msgIsEthAddress) {
+    const msgMatch = message.match(/0x[a-fA-F0-9]{40}/);
+    const msgAddress = msgMatch ? msgMatch[0] : "";
+
+    const scanAddress = /^0x[a-fA-F0-9]{40}$/.test(ctxAddress)
+      ? ctxAddress
+      : /^0x[a-fA-F0-9]{40}$/.test(msgAddress)
+      ? msgAddress
+      : null;
+
+    if (scanAddress) {
       const farcasterUsername = (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
@@ -72,24 +82,24 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ===== all normal chat goes through Gemini =====
+    // ===== chat (ALL normal conversation goes to Gemini) =====
     if (!apiKey) {
-      return res.status(200).json({ ok: true, reply: "Chat is not available right now." });
+      return res.status(200).json({ ok: true, reply: "Data not available." });
     }
+
+    const trimmedHistory = history.slice(-10).map((m) => ({
+      role: m?.role === "assistant" ? "model" : "user",
+      parts: [{ text: String(m?.text || "").slice(0, 2000) }],
+    }));
 
     const systemText =
       "You are an assistant inside a Base blockchain explorer mini app. " +
-      "Chat normally (casual conversation is allowed). " +
-      "Reply in the user's language (Indonesian or English). " +
-      "Keep replies clean and helpful. " +
+      "Chat normally. Reply in the user's language (Indonesian or English). " +
       "Do not invent on-chain data. If on-chain data is missing, say: Data not available.";
 
     const contents = [
-      ...history.map((m) => ({
-        role: m?.role === "assistant" ? "model" : "user",
-        parts: [{ text: String(m?.text || "") }],
-      })),
-      { role: "user", parts: [{ text: `${systemText}\n\nUser message:\n${message}` }] },
+      ...trimmedHistory,
+      { role: "user", parts: [{ text: `${systemText}\n\n${message}` }] },
     ];
 
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -104,7 +114,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           contents,
-          generationConfig: { temperature: 0.6, maxOutputTokens: 300 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 350 },
         }),
       }
     );
@@ -112,15 +122,15 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => null);
 
     if (!r.ok) {
-      return res.status(200).json({ ok: true, reply: "Chat is not available right now." });
+      return res.status(200).json({ ok: true, reply: "Data not available." });
     }
 
     const reply =
       j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
-      "Chat is not available right now.";
+      "Data not available.";
 
     return res.status(200).json({ ok: true, reply });
   } catch {
-    return res.status(200).json({ ok: true, reply: "Chat is not available right now." });
+    return res.status(200).json({ ok: true, reply: "Data not available." });
   }
 }
