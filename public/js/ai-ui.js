@@ -172,6 +172,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   if (__aiMessages.length === 0) {
-    __aiAdd("assistant", "Paste an address + your question.");
+    __aiAdd("assistant", "Welcome to Base Mini Scan AI🤗<br>Paste an address and ask your question.");
   }
 });
