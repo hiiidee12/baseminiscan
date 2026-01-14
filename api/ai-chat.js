@@ -1,3 +1,4 @@
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -17,12 +18,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // ===== scan trigger: ONLY if message contains an ETH address =====
-    const m = message.match(/0x[a-fA-F0-9]{40}/);
-    const scanAddress = m ? m[0] : null;
+    // ===== deterministic scan output =====
+    const address =
+      (context && typeof context === "object" && context.address) || null;
 
-    if (scanAddress) {
-      const farcasterUsername = (context && context.farcasterUsername) || null;
+    if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
+      const farcasterUsername =
+        (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
         context && context.neynarScore !== undefined ? context.neynarScore : null;
@@ -44,6 +46,7 @@ export default async function handler(req, res) {
           ? "Data not available"
           : String(neynarScoreRaw);
 
+      // balance priority: balanceEth -> convert from balanceWei
       let safeBalance = "Data not available";
       if (balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "") {
         safeBalance = `${String(balanceEthRaw)} ETH`;
@@ -55,7 +58,9 @@ export default async function handler(req, res) {
           const fracPart = w % base;
           const frac6 = (fracPart / 10n ** 12n).toString().padStart(6, "0");
           safeBalance = `${intPart.toString()}.${frac6} ETH`;
-        } catch {}
+        } catch {
+          // ignore
+        }
       }
 
       const safeTx =
@@ -73,33 +78,35 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ===== chat: ALWAYS through Gemini =====
+    // ===== fallback Gemini for non-scan questions =====
     if (!apiKey) {
-      return res.status(200).json({ ok: true, reply: "Chat service unavailable." });
+      return res.status(200).json({ ok: true, reply: "Data not available." });
     }
 
-    const systemText =
-      "You are an assistant inside a Base blockchain explorer mini app. " +
-      "Chat normally (casual conversation allowed). " +
-      "Reply in the user's language (Indonesian or English). " +
-      "Do not invent on-chain data. If on-chain data is missing, say: Data not available.";
+    const safeMessage = message.slice(0, 3000);
 
-    const mappedHistory = history.map((m) => ({
-      role: m?.role === "assistant" || m?.role === "model" ? "model" : "user",
-      parts: [{ text: String(m?.text || "") }],
+    const trimmedHistory = history.slice(-8).map((m) => ({
+      role: m?.role === "assistant" ? "model" : "user",
+      parts: [{ text: String(m?.text || "").slice(0, 2000) }],
     }));
 
+    const systemText =
+      "You are an assistant for a Base Mini Scan. " +
+      "Respond in clean, simple English. " +
+      "Do not invent data. If data is missing, say: Data not available.";
+
+    const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
+
     const contents = [
-      ...mappedHistory,
-      { role: "user", parts: [{ text: `${systemText}\n\n${message}` }] },
+      ...trimmedHistory,
+      { role: "user", parts: [{ text: `${systemText}\n\n${userPrompt}` }] },
     ];
 
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-    async function callGemini() {
-      const r = await fetch(url, {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -107,30 +114,27 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           contents,
-          generationConfig: { temperature: 0.6, maxOutputTokens: 350 },
+          generationConfig: { temperature: 0.2, maxOutputTokens: 250 },
         }),
-      });
+      }
+    );
 
-      const j = await r.json().catch(() => null);
-      return { r, j };
-    }
-
-    // 1x retry on failure
-    let { r, j } = await callGemini();
-    if (!r.ok) {
-      ({ r, j } = await callGemini());
-    }
+    const j = await r.json().catch(() => null);
 
     if (!r.ok) {
-      return res.status(200).json({ ok: true, reply: "Chat service unavailable." });
+      return res
+        .status(r.status)
+        .json({ ok: false, error: "Gemini error", detail: j });
     }
 
     const reply =
-      j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
-      "Chat service unavailable.";
+      j?.candidates?.[0]?.content?.parts
+        ?.map((p) => p?.text || "")
+        .join("")
+        .trim() || "Data not available.";
 
     return res.status(200).json({ ok: true, reply });
   } catch {
-    return res.status(200).json({ ok: true, reply: "Chat service unavailable." });
+    return res.status(500).json({ ok: false, error: "Server error" });
   }
 }
