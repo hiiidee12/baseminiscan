@@ -828,3 +828,7 @@ body[data-page="detail"] .topTabs{
 body[data-page="ai"] .profileCard {
   display: none;
 }
+
+.cardTitle {
+  text-align: center;
+}
