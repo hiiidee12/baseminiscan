@@ -3,14 +3,11 @@ const KEYS = [
   process.env.N_API_KEY_2,
 ].filter(Boolean);
 
-// Cache: address -> { ts, username, neynarScore, via }
 const CACHE = new Map();
-const TTL = 60 * 1000; // 1 menit
+const TTL = 60 * 1000; // 1 min
 
-// In-flight requests: address -> Promise
 const IN_FLIGHT = new Map();
 
-// Bersihkan cache tiap 2 menit
 setInterval(() => {
   const now = Date.now();
   for (const [addr, entry] of CACHE.entries()) {
@@ -38,14 +35,12 @@ async function fetchWithKey(address, key) {
 }
 
 function pickFirstUser(payload, address) {
-  // Neynar bisa balikin map langsung { "<address>": [...] } atau dibungkus { users: { ... } }
   const usersMap =
     (payload && typeof payload === "object" && payload.users) ? payload.users :
     (payload && typeof payload === "object" ? payload : null);
 
   if (!usersMap || typeof usersMap !== "object") return null;
 
-  // Cari key address tanpa bergantung casing (kadang Neynar balikin checksum)
   const addrLower = String(address || "").toLowerCase();
 
   let users =
@@ -86,7 +81,6 @@ function pickFirstUser(payload, address) {
 async function lookupAddress(address) {
   const keysCount = KEYS.length;
 
-  // cache hit
   const cached = CACHE.get(address);
   if (cached && Date.now() - cached.ts < TTL) {
     return {
