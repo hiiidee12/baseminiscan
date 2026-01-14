@@ -1,3 +1,57 @@
+const GEMINI_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+].filter(Boolean);
+
+let __geminiKeyIndex = 0;
+
+function pickGeminiKey() {
+  if (!GEMINI_KEYS.length) return null;
+  const k = GEMINI_KEYS[__geminiKeyIndex % GEMINI_KEYS.length];
+  __geminiKeyIndex = (__geminiKeyIndex + 1) % GEMINI_KEYS.length;
+  return k;
+}
+
+async function callGeminiWithRotation({ model, contents, temperature, maxOutputTokens }) {
+  if (!GEMINI_KEYS.length) return { ok: false, status: 0, json: null };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  let last = { ok: false, status: 0, json: null };
+
+  // coba maksimal sebanyak jumlah key
+  for (let attempt = 0; attempt < GEMINI_KEYS.length; attempt++) {
+    const apiKey = pickGeminiKey();
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents,
+        generationConfig: { temperature, maxOutputTokens },
+      }),
+    });
+
+    const j = await r.json().catch(() => null);
+
+    // sukses
+    if (r.ok) return { ok: true, status: r.status, json: j };
+
+    // hanya rotate kalau rate limit / quota / temporary
+    if (r.status === 429 || r.status === 503) {
+      last = { ok: false, status: r.status, json: j };
+      continue;
+    }
+
+    // error lain: jangan lanjut rotate (biasanya key salah / forbidden)
+    return { ok: false, status: r.status, json: j };
+  }
+
+  return last;
+}
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -5,8 +59,6 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
-
-  const apiKey = process.env.GEMINI_API_KEY;
 
   try {
     const body = req.body || {};
@@ -19,12 +71,10 @@ export default async function handler(req, res) {
     }
 
     // ===== deterministic scan output =====
-    const address =
-      (context && typeof context === "object" && context.address) || null;
+    const address = (context && typeof context === "object" && context.address) || null;
 
     if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
-      const farcasterUsername =
-        (context && context.farcasterUsername) || null;
+      const farcasterUsername = (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
         context && context.neynarScore !== undefined ? context.neynarScore : null;
@@ -38,15 +88,13 @@ export default async function handler(req, res) {
       const txCountRaw =
         context && context.txCount !== undefined ? context.txCount : null;
 
-      const safeFarcaster =
-        farcasterUsername ? String(farcasterUsername) : "Data not available";
+      const safeFarcaster = farcasterUsername ? String(farcasterUsername) : "Data not available";
 
       const safeNeynar =
         neynarScoreRaw === null || neynarScoreRaw === undefined || neynarScoreRaw === ""
           ? "Data not available"
           : String(neynarScoreRaw);
 
-      // balance priority: balanceEth -> convert from balanceWei
       let safeBalance = "Data not available";
       if (balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "") {
         safeBalance = `${String(balanceEthRaw)} ETH`;
@@ -58,9 +106,7 @@ export default async function handler(req, res) {
           const fracPart = w % base;
           const frac6 = (fracPart / 10n ** 12n).toString().padStart(6, "0");
           safeBalance = `${intPart.toString()}.${frac6} ETH`;
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
 
       const safeTx =
@@ -78,8 +124,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ===== fallback Gemini for non-scan questions =====
-    if (!apiKey) {
+    // ===== Gemini for non-scan questions (ROTATING KEYS) =====
+    if (!GEMINI_KEYS.length) {
       return res.status(200).json({ ok: true, reply: "Data not available." });
     }
 
@@ -104,37 +150,25 @@ export default async function handler(req, res) {
 
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { temperature: 0.2, maxOutputTokens: 250 },
-        }),
-      }
-    );
+    const out = await callGeminiWithRotation({
+      model,
+      contents,
+      temperature: 0.2,
+      maxOutputTokens: 250,
+    });
 
-    const j = await r.json().catch(() => null);
-
-    if (!r.ok) {
-      return res
-        .status(r.status)
-        .json({ ok: false, error: "Gemini error", detail: j });
+    if (!out.ok) {
+      return res.status(200).json({ ok: true, reply: "Data not available." });
     }
 
+    const j = out.json;
+
     const reply =
-      j?.candidates?.[0]?.content?.parts
-        ?.map((p) => p?.text || "")
-        .join("")
-        .trim() || "Data not available.";
+      j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
+      "Data not available.";
 
     return res.status(200).json({ ok: true, reply });
   } catch {
-    return res.status(500).json({ ok: false, error: "Server error" });
+    return res.status(200).json({ ok: true, reply: "Data not available." });
   }
 }
