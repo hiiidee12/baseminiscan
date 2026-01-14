@@ -17,12 +17,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    const safeMessage = message.slice(0, 3000);
+    const msgIsEthAddress = /^0x[a-fA-F0-9]{40}$/.test(message);
 
-    const address =
-      (context && typeof context === "object" && context.address) || null;
-
-    if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
+    // ===== deterministic scan output (ONLY when message is an ETH address) =====
+    if (msgIsEthAddress) {
       const farcasterUsername = (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
@@ -74,40 +72,24 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
+    // ===== all normal chat goes through Gemini =====
     if (!apiKey) {
-      const t = safeMessage.toLowerCase();
-
-      if (/(^|\s)(thanks|thx|makasih|terima kasih)(\s|$)/i.test(t)) {
-        return res.status(200).json({ ok: true, reply: "You're welcome." });
-      }
-      if (/(^|\s)(nice|mantap|nais|naisu|keren|sip)(\s|$)/i.test(t)) {
-        return res.status(200).json({ ok: true, reply: "Glad it helps." });
-      }
-      if (/(^|\s)(ok|oke|okay)(\s|$)/i.test(t)) {
-        return res.status(200).json({ ok: true, reply: "👍" });
-      }
-
-      return res.status(200).json({
-        ok: true,
-        reply: "Paste an address (0x...) to scan, or ask a question.",
-      });
+      return res.status(200).json({ ok: true, reply: "Chat is not available right now." });
     }
 
-    const trimmedHistory = history.slice(-8).map((m) => ({
-      role: m?.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m?.text || "").slice(0, 2000) }],
-    }));
-
     const systemText =
-      "You are an assistant for a Base blockchain explorer mini app. " +
-      "Respond in clean, simple English. " +
-      "Do not invent data. If data is missing, say: Data not available.";
-
-    const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
+      "You are an assistant inside a Base blockchain explorer mini app. " +
+      "Chat normally (casual conversation is allowed). " +
+      "Reply in the user's language (Indonesian or English). " +
+      "Keep replies clean and helpful. " +
+      "Do not invent on-chain data. If on-chain data is missing, say: Data not available.";
 
     const contents = [
-      ...trimmedHistory,
-      { role: "user", parts: [{ text: `${systemText}\n\n${userPrompt}` }] },
+      ...history.map((m) => ({
+        role: m?.role === "assistant" ? "model" : "user",
+        parts: [{ text: String(m?.text || "") }],
+      })),
+      { role: "user", parts: [{ text: `${systemText}\n\nUser message:\n${message}` }] },
     ];
 
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -122,7 +104,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           contents,
-          generationConfig: { temperature: 0.2, maxOutputTokens: 250 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 300 },
         }),
       }
     );
@@ -130,17 +112,15 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => null);
 
     if (!r.ok) {
-      return res.status(200).json({ ok: true, reply: "Data not available." });
+      return res.status(200).json({ ok: true, reply: "Chat is not available right now." });
     }
 
     const reply =
-      j?.candidates?.[0]?.content?.parts
-        ?.map((p) => p?.text || "")
-        .join("")
-        .trim() || "Data not available.";
+      j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
+      "Chat is not available right now.";
 
     return res.status(200).json({ ok: true, reply });
   } catch {
-    return res.status(200).json({ ok: true, reply: "Data not available." });
+    return res.status(200).json({ ok: true, reply: "Chat is not available right now." });
   }
 }
