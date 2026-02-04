@@ -115,10 +115,10 @@ export default async function handler(req, res) {
           : String(txCountRaw);
 
       const lines = [
-        `🧐 Farcaster: ${safeFarcaster}`,
-        `🥳 Neynar: ${safeNeynar}`,
-        `🤑 Balance: ${safeBalance}`,
-        `🤯 Total TX: ${safeTx}`,
+        `💳 Farcaster: ${safeFarcaster}`,
+        `🧬 Neynar: ${safeNeynar}`,
+        `💰 Balance: ${safeBalance}`,
+        `📑 Total TX: ${safeTx}`,
       ];
 
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
