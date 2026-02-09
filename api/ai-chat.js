@@ -196,7 +196,7 @@ export default async function handler(req, res) {
 
     const systemText =
       "You are an assistant for a Base Mini Scan. " +
-      "Respond in clean, simple English. ";
+      "respond to questions according to the language used. ";
 
     const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
 
