@@ -19,7 +19,6 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
 
   let last = { ok: false, status: 0, json: null };
 
-  // 
   for (let attempt = 0; attempt < GEMINI_KEYS.length; attempt++) {
     const apiKey = pickGeminiKey();
 
@@ -37,16 +36,13 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
 
     const j = await r.json().catch(() => null);
 
-    // 
     if (r.ok) return { ok: true, status: r.status, json: j };
 
-    // 
     if (r.status === 429 || r.status === 503) {
       last = { ok: false, status: r.status, json: j };
       continue;
     }
 
-    // 
     return { ok: false, status: r.status, json: j };
   }
 
@@ -120,6 +116,68 @@ export default async function handler(req, res) {
         `💰 Balance: ${safeBalance}`,
         `📑 Total TX: ${safeTx}`,
       ];
+
+      // ===== summary (deterministic) =====
+      const toNum = (v) => {
+        if (v === null || v === undefined || v === "") return null;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const neynarScoreNum = toNum(neynarScoreRaw);
+      const balanceEthNum = toNum(balanceEthRaw);
+      const txCountNum = toNum(txCountRaw);
+
+      // parse balance from wei if balanceEth missing
+      let balanceEthParsed = balanceEthNum;
+      if (
+        (balanceEthParsed === null || balanceEthParsed === undefined) &&
+        balanceWeiRaw !== null &&
+        balanceWeiRaw !== undefined &&
+        balanceWeiRaw !== ""
+      ) {
+        try {
+          const w = BigInt(String(balanceWeiRaw));
+          const base = 10n ** 18n;
+          const intPart = w / base;
+          const fracPart = w % base;
+          // keep 6 decimals for numeric comparison
+          const frac6 = Number(fracPart / 10n ** 12n) / 1e6; // 0..0.999999
+          balanceEthParsed = Number(intPart) + frac6;
+        } catch {}
+      }
+
+      const summary = [];
+
+      // Activity level (TX)
+      if (txCountNum !== null) {
+        if (txCountNum >= 1000) summary.push("High transaction activity");
+        else if (txCountNum >= 200) summary.push("Moderate transaction activity");
+        else summary.push("Low transaction activity");
+      }
+
+      // Balance level
+      if (balanceEthParsed !== null && balanceEthParsed !== undefined) {
+        if (balanceEthParsed < 0.01) summary.push("Low retained balance");
+        else if (balanceEthParsed < 0.1) summary.push("Modest retained balance");
+        else summary.push("Meaningful retained balance");
+      }
+
+      // Social (Neynar) as soft signal
+      if (neynarScoreNum !== null) {
+        if (neynarScoreNum >= 0.7) summary.push("Strong social signal");
+        else if (neynarScoreNum >= 0.4) summary.push("Average social signal");
+        else summary.push("Weak social signal");
+      }
+
+      if (summary.length) {
+        lines.push("");
+        lines.push("🧠 Summary:");
+        for (const s of summary) {
+          lines.push(`• ${s}`);
+        }
+      }
+      // ===== END summary =====
 
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
