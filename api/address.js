@@ -35,6 +35,10 @@ export default async function handler(req, res) {
       process.env.ETHERSCAN_API_KEY_2,
       process.env.ETHERSCAN_API_KEY_3,
       process.env.ETHERSCAN_API_KEY_4,
+      process.env.ETHERSCAN_API_KEY_21,
+      process.env.ETHERSCAN_API_KEY_22,
+      process.env.ETHERSCAN_API_KEY_23,
+      process.env.ETHERSCAN_API_KEY_24,
     ].filter(Boolean);
 
     const TX_KEYS = [
