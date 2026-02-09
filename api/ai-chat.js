@@ -172,7 +172,7 @@ export default async function handler(req, res) {
 
       if (summary.length) {
         lines.push("");
-        lines.push("🧠 Summary:");
+        lines.push("🧠 Summary");
         for (const s of summary) {
           lines.push(`• ${s}`);
         }
