@@ -151,23 +151,23 @@ export default async function handler(req, res) {
 
       // Activity level (TX)
       if (txCountNum !== null) {
-        if (txCountNum >= 1000) summary.push("High transaction activity");
-        else if (txCountNum >= 200) summary.push("Moderate transaction activity");
-        else summary.push("Low transaction activity");
+        if (txCountNum >= 500) summary.push("High transaction activity💥");
+        else if (txCountNum >= 100) summary.push("Moderate transaction activity🔵");
+        else summary.push("Low transaction activity💔");
       }
 
       // Balance level
       if (balanceEthParsed !== null && balanceEthParsed !== undefined) {
-        if (balanceEthParsed < 0.01) summary.push("Low retained balance");
-        else if (balanceEthParsed < 0.1) summary.push("Modest retained balance");
-        else summary.push("Meaningful retained balance");
+        if (balanceEthParsed < 0.001) summary.push("Low retained balance💸");
+        else if (balanceEthParsed < 0.01) summary.push("Modest retained balance💵");
+        else summary.push("Meaningful retained balance💰");
       }
 
       // Social (Neynar) as soft signal
       if (neynarScoreNum !== null) {
-        if (neynarScoreNum >= 0.7) summary.push("Strong social signal");
-        else if (neynarScoreNum >= 0.4) summary.push("Average social signal");
-        else summary.push("Weak social signal");
+        if (neynarScoreNum >= 0.75) summary.push("Strong social signal🔥");
+        else if (neynarScoreNum >= 0.5) summary.push("Average social signal🪩");
+        else summary.push("Weak social signal👾");
       }
 
       if (summary.length) {
