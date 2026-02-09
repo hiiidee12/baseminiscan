@@ -270,7 +270,7 @@ export default async function handler(req, res) {
     // Optional: fetch approximate transaction count
     let txCount = null;
     if (wantCount && COUNT_KEYS.length) {
-      const PAGE = 2000;
+      const PAGE = 5000;
 
       const pageLen = async (apikey, p) => {
         const url = `${API}?${qs({
