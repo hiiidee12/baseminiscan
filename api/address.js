@@ -26,13 +26,8 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", cacheByTab[tab] || cacheByTab.tx);
     res.setHeader("Vary", "Accept-Encoding");
 
-    // Alchemy key pool (Base Mainnet)
-    const ALCHEMY_KEYS = [
-      process.env.A_KEY,
-      process.env.A_KEY,
-      process.env.A_KEY,
-      process.env.A_KEY,
-    ].filter(Boolean);
+    // Alchemy key pool (Base Mainnet) - single key
+    const ALCHEMY_KEYS = [process.env.A_KEY].filter(Boolean);
 
     if (!ALCHEMY_KEYS.length) {
       return res.status(200).json({
@@ -112,7 +107,7 @@ export default async function handler(req, res) {
 
     const normalizeTransfer = (t) => {
       const ts = isoToTimeStamp(t?.metadata?.blockTimestamp);
-      const valueWei = t?.rawContract?.value ? t.rawContract.value : null; // hex string if present
+      const valueWei = t?.rawContract?.value ? t.rawContract.value : null;
       const tokenId = t?.tokenId ? t.tokenId : (t?.erc1155Metadata?.[0]?.tokenId || null);
 
       return {
@@ -140,18 +135,11 @@ export default async function handler(req, res) {
       };
     };
 
-    // balance (wei)
     const balanceWei = await tryWithPool(ALCHEMY_KEYS, async (apikey) => {
-      try {
-        return await rpc(apikey, "eth_getBalance", [address, "latest"]);
-      } catch (e) {
-        if (isTransientHttp(e.__httpStatus)) throw e;
-        throw e;
-      }
+      return await rpc(apikey, "eth_getBalance", [address, "latest"]);
     });
 
-    // transfers list (Alchemy)
-    const desired = Math.min(250, page * offset); // cap
+    const desired = Math.min(250, page * offset);
     const categories =
       tab === "erc20" ? ["erc20"] :
       tab === "internal" ? ["internal"] :
@@ -166,7 +154,7 @@ export default async function handler(req, res) {
 
       while (collected.length < desired) {
         const maxLeft = desired - collected.length;
-        const maxCount = hexCount(Math.min(200, maxLeft)); // keep per-call reasonable
+        const maxCount = hexCount(Math.min(200, maxLeft));
 
         const params = [{
           fromBlock: "0x0",
@@ -196,14 +184,9 @@ export default async function handler(req, res) {
     let listRaw = [];
     try {
       listRaw = await tryWithPool(ALCHEMY_KEYS, async (apikey) => {
-        try {
-          return await fetchTransfersUpTo(apikey);
-        } catch (e) {
-          if (isTransientHttp(e.__httpStatus)) throw e;
-          throw e;
-        }
+        return await fetchTransfersUpTo(apikey);
       });
-    } catch (e) {
+    } catch {
       return res.status(200).json({
         address,
         chain: "base",
@@ -215,14 +198,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // normalize + sort by timestamp desc (just in case)
     const normalized = listRaw.map(normalizeTransfer);
     normalized.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
 
     const start = (page - 1) * offset;
     const list = normalized.slice(start, start + offset);
 
-    // txCount: not cheap on Alchemy with this model; keep null (or lightweight heuristic)
     let txCount = null;
     if (wantCount) {
       if (desired >= 250 && normalized.length >= 250) txCount = "250+";
@@ -239,7 +220,15 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     const msg = (e && e.message) ? e.message : "";
-    return res.status(500).json({ error: "Internal server error", code: msg || "UNKNOWN" });
+    return res.status(200).json({
+      address: (req.query.address || "").toString().trim() || null,
+      chain: "base",
+      tab: ((req.query.tab || "tx").toString().trim().toLowerCase()) || "tx",
+      balanceWei: null,
+      txCount: null,
+      list: [],
+      error: "ALCHEMY_ERROR",
+      code: msg || "UNKNOWN",
+    });
   }
 }
-```0
