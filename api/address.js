@@ -157,7 +157,6 @@ export default async function handler(req, res) {
       const { json, httpStatus, ok } = await fetchJson(url);
 
       if (!ok || json?.status !== "1") {
-        // rotate key only for throttling/transient
         if (isRateLimited(json, httpStatus) || isTransientHttp(httpStatus)) {
           throw new Error("RETRY_KEY");
         }
@@ -267,7 +266,7 @@ export default async function handler(req, res) {
       return Array.isArray(json.result) ? json.result : [];
     });
 
-    // Optional: fetch approximate transaction count
+    // Optional: fetch approximate transaction count (matches current tab)
     let txCount = null;
     if (wantCount && COUNT_KEYS.length) {
       const PAGE = 1000;
@@ -276,7 +275,7 @@ export default async function handler(req, res) {
         const url = `${API}?${qs({
           chainid: 8453,
           module: "account",
-          action: "txlist",
+          action: listAction,
           address,
           page: p,
           offset: PAGE,
@@ -313,13 +312,10 @@ export default async function handler(req, res) {
       chain: "base",
       tab,
       balanceWei: balance,
-      totalTxCount: txCount,
       txCount,
       list,
     });
   } catch (e) {
-    // Optional: expose minimal signal for debugging without leaking internals
-    // const msg = (e && e.message) ? e.message : "";
     return res.status(500).json({ error: "Internal server error" });
   }
 }
