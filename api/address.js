@@ -164,7 +164,7 @@ export default async function handler(req, res) {
         json?.contractMetadata?.opensea?.collectionName ||
         null;
 
-      __nameCache.set(k, { name, expiresAt: now + 6 * 60 * 60 * 1000 }); // 6 jam
+      __nameCache.set(k, { name, expiresAt: now + 1 * 60 * 1000 }); // 1 min
       return name;
     };
 
