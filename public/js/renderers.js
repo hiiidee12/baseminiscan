@@ -61,7 +61,12 @@ function renderTxTable(list = []) {
 
 function renderErc20Table(list = []) {
   const rows = list.slice(0, 25).map(t => {
-    const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? t.rawContract?.decimal ?? 0;
+    const decRaw = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? t.rawContract?.decimal ?? 0;
+
+const dec =
+  (typeof decRaw === "string" && decRaw.startsWith("0x"))
+    ? parseInt(decRaw, 16)
+    : Number(decRaw) || 0;
 
     const raw =
       t.rawValue ??
