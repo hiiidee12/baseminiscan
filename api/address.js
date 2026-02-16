@@ -17,9 +17,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid address" });
     }
 
-    res.setHeader("Cache-Control", "no-store");
+    const cacheByTab = {
+      tx: "s-maxage=10, stale-while-revalidate=60",
+      erc20: "s-maxage=0, max-age=0, must-revalidate",
+      internal: "s-maxage=60, stale-while-revalidate=100",
+      nft: "s-maxage=60, stale-while-revalidate=100",
+    };
+    res.setHeader("Cache-Control", cacheByTab[tab] || cacheByTab.tx);
     res.setHeader("Vary", "Accept-Encoding");
 
+    // Alchemy key pool (Base Mainnet) - single key
     const ALCHEMY_KEYS = [process.env.A_KEY].filter(Boolean);
 
     if (!ALCHEMY_KEYS.length) {
@@ -36,7 +43,7 @@ export default async function handler(req, res) {
 
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    const fetchJson = async (url, body, { timeoutMs = 12000 } = {}) => {
+    const fetchJson = async (url, body, { timeoutMs = 12_000 } = {}) => {
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), timeoutMs);
       try {
@@ -59,7 +66,7 @@ export default async function handler(req, res) {
       }
     };
 
-    const fetchJsonGet = async (url, { timeoutMs = 12000 } = {}) => {
+    const fetchJsonGet = async (url, { timeoutMs = 12_000 } = {}) => {
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), timeoutMs);
       try {
@@ -76,6 +83,8 @@ export default async function handler(req, res) {
         clearTimeout(t);
       }
     };
+
+    const isTransientHttp = (s) => [429, 500, 502, 503, 504].includes(s);
 
     const tryWithPool = async (pool, fn, { retryDelayMs = 250 } = {}) => {
       let lastErr;
@@ -95,9 +104,12 @@ export default async function handler(req, res) {
       const url = `https://base-mainnet.g.alchemy.com/v2/${apikey}`;
       const payload = { jsonrpc: "2.0", id: 1, method, params };
       const { json, httpStatus, ok } = await fetchJson(url, payload);
+
       if (!ok || json?.error) {
-        const err = new Error(json?.error?.message || "RPC_FAILED");
+        const msg = (json?.error?.message || "").toString();
+        const err = new Error(msg || "RPC_FAILED");
         err.__httpStatus = httpStatus;
+        err.__rpcError = json?.error || null;
         throw err;
       }
       return json.result;
@@ -107,19 +119,22 @@ export default async function handler(req, res) {
 
     const isoToTimeStamp = (iso) => {
       const t = Date.parse(iso);
-      return Number.isFinite(t) ? Math.floor(t / 1000).toString() : "0";
+      if (!Number.isFinite(t)) return "0";
+      return Math.floor(t / 1000).toString();
     };
 
     const hexToDecStr = (hex) => {
       try {
         if (!hex) return null;
         const s = hex.toString();
-        return s.startsWith("0x") ? BigInt(s).toString(10) : s;
+        if (!s.startsWith("0x")) return s; // already decimal-ish
+        return BigInt(s).toString(10);
       } catch {
         return null;
       }
     };
 
+    // simple global cache for contract names (avoid spamming)
     const __nameCache =
       globalThis.__alchemyContractNameCache ||
       (globalThis.__alchemyContractNameCache = new Map());
@@ -127,6 +142,7 @@ export default async function handler(req, res) {
     const getContractName = async (apikey, contractAddress) => {
       const k = (contractAddress || "").toLowerCase();
       if (!k) return null;
+
       const now = Date.now();
       const hit = __nameCache.get(k);
       if (hit && hit.expiresAt > now) return hit.name;
@@ -148,14 +164,16 @@ export default async function handler(req, res) {
         json?.contractMetadata?.opensea?.collectionName ||
         null;
 
-      __nameCache.set(k, { name, expiresAt: now + 21600000 });
+      __nameCache.set(k, { name, expiresAt: now + 6 * 60 * 60 * 1000 }); // 6 jam
       return name;
     };
 
     const normalizeTransfer = (t) => {
       const ts = isoToTimeStamp(t?.metadata?.blockTimestamp);
-      const rawHex = t?.rawContract?.value ?? null;
+
+      const rawHex = t?.rawContract?.value ? t.rawContract.value : null;
       const rawDec = hexToDecStr(rawHex);
+
       const tokenId =
         t?.tokenId ??
         t?.erc721TokenId ??
@@ -165,21 +183,30 @@ export default async function handler(req, res) {
         hash: t?.hash || "",
         from: t?.from || "",
         to: t?.to || "",
+
+        // for renderers: prefer rawValue (base units) + decimals when present
         rawValue: rawDec ?? null,
         value: t?.value ?? null,
+
         asset: t?.asset ?? null,
         category: t?.category ?? null,
+
         blockNum: t?.blockNum ?? null,
         timeStamp: ts,
+
         contractAddress: t?.rawContract?.address || null,
+
         tokenId,
         uniqueId: t?.uniqueId || null,
+
         nftStd:
           t?.category === "erc721" ? "ERC-721" :
           t?.category === "erc1155" ? "ERC-1155" :
           t?.category === "specialnft" ? "NFT" :
           null,
-        tokenName: null,
+
+        tokenName: null, // will be enriched for nft tab
+
         rawContract: {
           address: t?.rawContract?.address || null,
           value: rawHex,
@@ -188,10 +215,12 @@ export default async function handler(req, res) {
       };
     };
 
-    const balanceWei = await tryWithPool(ALCHEMY_KEYS, (apikey) =>
-      rpc(apikey, "eth_getBalance", [address, "latest"])
-    );
+    const balanceWei = await tryWithPool(ALCHEMY_KEYS, async (apikey) => {
+      return await rpc(apikey, "eth_getBalance", [address, "latest"]);
+    });
 
+    // IMPORTANT: Base does NOT support "internal" category via Transfers API.
+    // We return a clean empty response instead of throwing.
     if (tab === "internal") {
       return res.status(200).json({
         address,
@@ -213,30 +242,16 @@ export default async function handler(req, res) {
 
     const order = "desc";
 
-    const getFromBlock = async () => {
-      if (page !== 1) return "0x0";
-      try {
-        const latestHex = await tryWithPool(ALCHEMY_KEYS, (apikey) =>
-          rpc(apikey, "eth_blockNumber", [])
-        );
-        const latest = Number(BigInt(latestHex || "0x0"));
-        const from = Math.max(0, latest - 20000);
-        return "0x" + from.toString(16);
-      } catch {
-        return "0x0";
-      }
-    };
-
-    const fromBlock = await getFromBlock();
-
     const fetchTransfersUpTo = async (apikey) => {
       let collected = [];
-      let pageKey;
+      let pageKey = undefined;
+
       while (collected.length < desired) {
         const maxLeft = desired - collected.length;
         const maxCount = hexCount(Math.min(200, maxLeft));
+
         const params = [{
-          fromBlock,
+          fromBlock: "0x0",
           toBlock: "latest",
           fromAddress: address,
           category: categories,
@@ -245,19 +260,26 @@ export default async function handler(req, res) {
           maxCount,
           order,
         }];
+
         if (pageKey) params[0].pageKey = pageKey;
+
         const result = await rpc(apikey, "alchemy_getAssetTransfers", params);
+
         const transfers = Array.isArray(result?.transfers) ? result.transfers : [];
         collected.push(...transfers);
+
         pageKey = result?.pageKey;
         if (!pageKey || transfers.length === 0) break;
       }
+
       return collected;
     };
 
     let listRaw = [];
     try {
-      listRaw = await tryWithPool(ALCHEMY_KEYS, fetchTransfersUpTo);
+      listRaw = await tryWithPool(ALCHEMY_KEYS, async (apikey) => {
+        return await fetchTransfersUpTo(apikey);
+      });
     } catch {
       return res.status(200).json({
         address,
@@ -272,9 +294,11 @@ export default async function handler(req, res) {
 
     const normalized = listRaw.map(normalizeTransfer);
 
+    // Enrich NFT collection name (contract name)
     if (tab === "nft") {
       const uniq = [];
       const seen = new Set();
+
       for (const it of normalized) {
         const ca = it.contractAddress;
         if (!ca) continue;
@@ -282,7 +306,7 @@ export default async function handler(req, res) {
         if (seen.has(k)) continue;
         seen.add(k);
         uniq.push(ca);
-        if (uniq.length >= 40) break;
+        if (uniq.length >= 40) break; // limit
       }
 
       try {
@@ -306,7 +330,9 @@ export default async function handler(req, res) {
             if (n) it.tokenName = n;
           }
         }
-      } catch {}
+      } catch {
+        // silent
+      }
     }
 
     normalized.sort((a, b) => Number(b.timeStamp) - Number(a.timeStamp));
@@ -314,15 +340,22 @@ export default async function handler(req, res) {
     const start = (page - 1) * offset;
     const list = normalized.slice(start, start + offset);
 
+    // txCount: keep null (Alchemy doesn't provide cheap full count like Etherscan)
+    let txCount = null;
+    if (wantCount) {
+      txCount = null;
+    }
+
     return res.status(200).json({
       address,
       chain: "base",
       tab,
       balanceWei,
-      txCount: wantCount ? null : null,
+      txCount,
       list,
     });
   } catch (e) {
+    const msg = (e && e.message) ? e.message : "";
     return res.status(200).json({
       address: (req.query.address || "").toString().trim() || null,
       chain: "base",
@@ -331,7 +364,7 @@ export default async function handler(req, res) {
       txCount: null,
       list: [],
       error: "ALCHEMY_ERROR",
-      code: e?.message || "UNKNOWN",
+      code: msg || "UNKNOWN",
     });
   }
 }
