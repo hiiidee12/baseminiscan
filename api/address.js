@@ -18,10 +18,10 @@ export default async function handler(req, res) {
     }
 
     const cacheByTab = {
-      tx: "s-maxage=30, stale-while-revalidate=120",
-      erc20: "s-maxage=30, stale-while-revalidate=180",
-      internal: "s-maxage=60, stale-while-revalidate=300",
-      nft: "s-maxage=120, stale-while-revalidate=900",
+      tx: "s-maxage=10, stale-while-revalidate=60",
+      erc20: "s-maxage=0, max-age=0, must-revalidate",
+      internal: "s-maxage=60, stale-while-revalidate=100",
+      nft: "s-maxage=60, stale-while-revalidate=100",
     };
     res.setHeader("Cache-Control", cacheByTab[tab] || cacheByTab.tx);
     res.setHeader("Vary", "Accept-Encoding");
