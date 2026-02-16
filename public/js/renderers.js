@@ -38,7 +38,7 @@ function renderTxTable(list = []) {
     <tr>
       <td>
         <span class="click" data-open="${makeBaseScanUrl(tx.hash)}">${shortHex(tx.hash)}</span>
-        <div class="small">Block ${tx.blockNumber}</div>
+        <div class="small">Block ${tx.blockNumber ?? tx.blockNum ?? "-"}</div>
       </td>
       <td class="small">${ageFromTs(tx.timeStamp)}</td>
       <td class="small">${shortHex(tx.from)}</td>
@@ -61,18 +61,34 @@ function renderTxTable(list = []) {
 
 function renderErc20Table(list = []) {
   const rows = list.slice(0, 25).map(t => {
-    const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? 0;
-    const human = formatTokenAmount(t.value, dec, 6);
+    const dec = t.tokenDecimal ?? t.tokenDecimals ?? t.decimals ?? t.rawContract?.decimal ?? 0;
+
+    const raw =
+      t.rawValue ??
+      t.value ??
+      "0";
+
+    const human = formatTokenAmount(raw, dec, 6);
     const show = compactNumberString(human);
+
+    const tokenLabel =
+      t.tokenSymbol ??
+      t.asset ??
+      "-";
+
+    const tokenName =
+      t.tokenName ??
+      t.asset ??
+      "";
 
     return `
       <tr>
         <td>
           <span class="click" data-open="${makeBaseScanUrl(t.hash)}">${shortHex(t.hash)}</span>
-          <div class="small">${t.tokenName ? String(t.tokenName).slice(0, 32) : ""}</div>
+          <div class="small">${tokenName ? String(tokenName).slice(0, 32) : ""}</div>
         </td>
         <td class="small">${ageFromTs(t.timeStamp)}</td>
-        <td>${t.tokenSymbol || "-"}</td>
+        <td>${tokenLabel}</td>
         <td class="small">${shortHex(t.from)}</td>
         <td class="small">${shortHex(t.to)}</td>
         <td title="${human}">${show}</td>
@@ -95,14 +111,14 @@ function renderErc20Table(list = []) {
 function renderInternalTable(list = []) {
   const rows = list.slice(0, 25).map(t => {
     const hash = t.hash || t.transactionHash || "-";
-    const typ = (t.type || t.callType || "-").toString();
+    const typ = (t.type || t.callType || t.category || "-").toString();
     const val = weiToEthStr(t.value) ?? "0.000000";
 
     return `
       <tr>
         <td>
           <span class="click" data-open="${makeBaseScanUrl(hash)}">${shortHex(hash)}</span>
-          <div class="small">Block ${t.blockNumber ?? "-"}</div>
+          <div class="small">Block ${t.blockNumber ?? t.blockNum ?? "-"}</div>
         </td>
         <td class="small">${ageFromTs(t.timeStamp)}</td>
         <td class="small">${shortHex(t.from)}</td>
@@ -133,12 +149,12 @@ function renderNftTable(list = []) {
       </td>
       <td class="small">${ageFromTs(t.timeStamp)}</td>
       <td class="small">${t.nftStd || "-"}</td>
-      <td>${t.tokenName || "-"}</td>
+      <td>${t.tokenName || t.asset || "-"}</td>
       <td class="small">${shortHex(t.from)}</td>
       <td class="small">${shortHex(t.to)}</td>
       <td class="small id">
   #${(() => {
-    const v = String(t.tokenID || "");
+    const v = String(t.tokenID || t.tokenId || t.tokenIdHex || "");
     return v.length > 5 ? v.slice(0, 5) + "…" : v;
   })()}
 </td>
