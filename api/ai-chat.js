@@ -114,7 +114,6 @@ export default async function handler(req, res) {
         `💳 Farcaster: ${safeFarcaster}`,
         `🧬 Neynar: ${safeNeynar}`,
         `💰 Balance: ${safeBalance}`,
-        `📑 Total TX: ${safeTx}`,
       ];
 
       // ===== summary (deterministic) =====
