@@ -39,10 +39,6 @@ function __pickBalanceWei(j) {
   return j?.balanceWei ?? j?.balance ?? j?.result?.balanceWei ?? j?.result?.balance ?? null;
 }
 
-function __pickTxCount(j) {
-  return j?.txCount ?? j?.totalTx ?? j?.result?.txCount ?? j?.result?.totalTx ?? null;
-}
-
 async function __fetchExplorerContext(address) {
   try {
     const [addrRes, fcRes] = await Promise.allSettled([
@@ -69,7 +65,6 @@ async function __fetchExplorerContext(address) {
     return {
       address,
       balanceWei: __pickBalanceWei(addrJson),
-      txCount: __pickTxCount(addrJson),
       sampleTx: list.map((x) => ({
         timeStamp: x.timeStamp,
         from: x.from,
