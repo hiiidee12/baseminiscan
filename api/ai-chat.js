@@ -335,7 +335,7 @@ export default async function handler(req, res) {
       if (/^0x[a-fA-F0-9]{40}$/.test(message)) {
         return res.status(200).json({
           ok: true,
-          reply: "Alamat terdeteksi. Ketik: `scan 0x...` untuk melihat ringkasan wallet.",
+          reply: "Type: `scan 0x...` to see wallet summary.",
         });
       }
     }
