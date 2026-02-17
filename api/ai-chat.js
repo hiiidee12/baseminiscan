@@ -1,6 +1,6 @@
 const GEMINI_KEYS = [
-  process.env.GEMINI_API_KEY,
-  process.env.GEMINI_API_KEY_2,
+  process.env.OPENAI_API_KEY,
+  process.env.OPENAI_API_KEY_2,
 ].filter(Boolean);
 
 let __geminiKeyIndex = 0;
@@ -12,10 +12,10 @@ function pickGeminiKey() {
   return k;
 }
 
-async function callGeminiWithRotation({ model, contents, temperature, maxOutputTokens }) {
+async function callGeminiWithRotation({ model, input, instructions, temperature, maxOutputTokens }) {
   if (!GEMINI_KEYS.length) return { ok: false, status: 0, json: null };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const url = "https://api.openai.com/v1/responses";
 
   let last = { ok: false, status: 0, json: null };
 
@@ -26,11 +26,15 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        contents,
-        generationConfig: { temperature, maxOutputTokens },
+        model,
+        instructions,
+        input,
+        temperature,
+        max_output_tokens: maxOutputTokens,
+        store: false,
       }),
     });
 
@@ -146,6 +150,37 @@ function __buildCoinGeckoText(coingecko) {
 
     if (!lines.length) return "";
     return lines.join("\n");
+  } catch {
+    return "";
+  }
+}
+
+function __extractOpenAIText(j) {
+  try {
+    if (!j || typeof j !== "object") return "";
+    if (typeof j.output_text === "string" && j.output_text.trim()) return j.output_text.trim();
+
+    const out = Array.isArray(j.output) ? j.output : [];
+    const chunks = [];
+
+    for (const item of out) {
+      if (!item || typeof item !== "object") continue;
+
+      if (item.type === "message" && item.role === "assistant") {
+        const content = Array.isArray(item.content) ? item.content : [];
+        for (const c of content) {
+          if (!c || typeof c !== "object") continue;
+          if (c.type === "output_text" && typeof c.text === "string") chunks.push(c.text);
+          if (c.type === "text" && typeof c.text === "string") chunks.push(c.text);
+        }
+      }
+
+      if (item.type === "output_text" && typeof item.text === "string") {
+        chunks.push(item.text);
+      }
+    }
+
+    return chunks.join("").trim();
   } catch {
     return "";
   }
@@ -283,8 +318,8 @@ export default async function handler(req, res) {
     const safeMessage = message.slice(0, 3000);
 
     const trimmedHistory = history.slice(-8).map((m) => ({
-      role: m?.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m?.text || "").slice(0, 2000) }],
+      role: m?.role === "assistant" ? "assistant" : "user",
+      content: String(m?.text || "").slice(0, 2000),
     }));
 
     const cgText = __buildCoinGeckoText(coingecko);
@@ -303,16 +338,17 @@ export default async function handler(req, res) {
       (cgText ? `Price/market data:\n${cgText}\n\n` : "") +
       `Rules:\n- Short answer\n- No hype`;
 
-    const contents = [
+    const input = [
       ...trimmedHistory,
-      { role: "user", parts: [{ text: `${systemText}\n\n${userPrompt}` }] },
+      { role: "user", content: userPrompt },
     ];
 
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+    const model = process.env.OPENAI_MODEL || "gpt-5";
 
     const out = await callGeminiWithRotation({
       model,
-      contents,
+      input,
+      instructions: systemText,
       temperature: 0.2,
       maxOutputTokens: 250,
     });
@@ -323,9 +359,7 @@ export default async function handler(req, res) {
 
     const j = out.json;
 
-    const reply =
-      j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
-      "Data not available.";
+    const reply = __extractOpenAIText(j) || "Data not available.";
 
     return res.status(200).json({ ok: true, reply });
   } catch {
