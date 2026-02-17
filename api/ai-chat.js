@@ -165,7 +165,7 @@ export default async function handler(req, res) {
       { role: "user", parts: [{ text: `${systemInstruction}\n\nUser Question: ${safeMessage}` }] },
     ];
 
-    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash-exp";
+    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash-exp";
 
     const out = await callGeminiWithRotation({
       model,
