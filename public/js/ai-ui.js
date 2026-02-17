@@ -159,7 +159,7 @@ async function __aiSendNow() {
   const coingecko = await __fetchCoinGeckoContext(text);
 
   const history = __aiMessages
-    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter((m) => (m.role === "user" || m.role === "assistant") && m.text !== "Thinking...")
     .slice(-10)
     .map((m) => ({ role: m.role, text: m.text }));
 
