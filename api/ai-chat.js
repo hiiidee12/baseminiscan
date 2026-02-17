@@ -217,9 +217,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
+    const msgLower = message.toLowerCase();
+    const scanMatch = msgLower.match(/\bscan\s+(0x[a-fA-F0-9]{40})\b/);
+    const scanAddress = scanMatch ? scanMatch[1] : null;
+    const isScanCommand = Boolean(scanAddress);
+
     const address = (context && typeof context === "object" && context.address) || null;
 
-    if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
+    if (isScanCommand) {
+      const address = scanAddress;
+
       const farcasterUsername = (context && context.farcasterUsername) || null;
 
       const neynarScoreRaw =
@@ -322,6 +329,15 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
+    }
+
+    if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
+      if (/^0x[a-fA-F0-9]{40}$/.test(message)) {
+        return res.status(200).json({
+          ok: true,
+          reply: "Alamat terdeteksi. Ketik: `scan 0x...` untuk melihat ringkasan wallet.",
+        });
+      }
     }
 
     if (!GEMINI_KEYS.length) {
