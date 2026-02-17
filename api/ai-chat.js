@@ -1,6 +1,5 @@
 const GEMINI_KEYS = [
   process.env.OPENAI_API_KEY,
-  process.env.OPENAI_API_KEY_2,
 ].filter(Boolean);
 
 let __geminiKeyIndex = 0;
@@ -15,12 +14,17 @@ function pickGeminiKey() {
 async function callGeminiWithRotation({ model, input, instructions, temperature, maxOutputTokens }) {
   if (!GEMINI_KEYS.length) return { ok: false, status: 0, json: null };
 
-  const url = "https://api.openai.com/v1/responses";
+  const url = "https://openrouter.ai/api/v1/chat/completions";
 
   let last = { ok: false, status: 0, json: null };
 
   for (let attempt = 0; attempt < GEMINI_KEYS.length; attempt++) {
     const apiKey = pickGeminiKey();
+
+    const messages = [
+      ...(instructions ? [{ role: "system", content: String(instructions) }] : []),
+      ...(Array.isArray(input) ? input : []),
+    ];
 
     const r = await fetch(url, {
       method: "POST",
@@ -30,11 +34,9 @@ async function callGeminiWithRotation({ model, input, instructions, temperature,
       },
       body: JSON.stringify({
         model,
-        instructions,
-        input,
+        messages,
         temperature,
-        max_output_tokens: maxOutputTokens,
-        store: false,
+        max_tokens: maxOutputTokens,
       }),
     });
 
@@ -158,6 +160,17 @@ function __buildCoinGeckoText(coingecko) {
 function __extractOpenAIText(j) {
   try {
     if (!j || typeof j !== "object") return "";
+
+    const choices = Array.isArray(j.choices) ? j.choices : [];
+    if (choices.length) {
+      const c0 = choices[0] && typeof choices[0] === "object" ? choices[0] : null;
+      const msg = c0 && c0.message && typeof c0.message === "object" ? c0.message : null;
+      if (msg && typeof msg.content === "string" && msg.content.trim()) return msg.content.trim();
+
+      const delta = c0 && c0.delta && typeof c0.delta === "object" ? c0.delta : null;
+      if (delta && typeof delta.content === "string" && delta.content.trim()) return delta.content.trim();
+    }
+
     if (typeof j.output_text === "string" && j.output_text.trim()) return j.output_text.trim();
 
     const out = Array.isArray(j.output) ? j.output : [];
