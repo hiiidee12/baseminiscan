@@ -343,14 +343,14 @@ export default async function handler(req, res) {
       { role: "user", content: userPrompt },
     ];
 
-    const model = process.env.OPENAI_MODEL || "gpt-5";
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
     const out = await callGeminiWithRotation({
       model,
       input,
       instructions: systemText,
       temperature: 0.2,
-      maxOutputTokens: 250,
+      maxOutputTokens: 500,
     });
 
     if (!out.ok) {
