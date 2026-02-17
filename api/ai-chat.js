@@ -199,6 +199,21 @@ function __extractOpenAIText(j) {
   }
 }
 
+async function fetchLocalGeckoTerminalToken(req, tokenAddress) {
+  const proto =
+    (req.headers["x-forwarded-proto"] || "https").toString().split(",")[0].trim();
+  const host =
+    (req.headers["x-forwarded-host"] || req.headers.host || "").toString().split(",")[0].trim();
+  const origin = host ? `${proto}://${host}` : "";
+
+  const url = `${origin}/api/geckoterminal?mode=token&network=base&address=${encodeURIComponent(tokenAddress)}`;
+
+  const r = await fetch(url, { headers: { accept: "application/json" } });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !j || !j.ok) return null;
+  return j.data || null;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -221,6 +236,10 @@ export default async function handler(req, res) {
     const scanMatch = msgLower.match(/\bscan\s+(0x[a-fA-F0-9]{40})\b/);
     const scanAddress = scanMatch ? scanMatch[1] : null;
     const isScanCommand = Boolean(scanAddress);
+
+    const searchMatch = msgLower.match(/\bsearch\s+(0x[a-fA-F0-9]{40})\b/);
+    const searchAddress = searchMatch ? searchMatch[1] : null;
+    const isSearchCommand = Boolean(searchAddress);
 
     const address = (context && typeof context === "object" && context.address) || null;
 
@@ -325,6 +344,62 @@ export default async function handler(req, res) {
         lines.push("🧠 Summary");
         for (const s of summary) {
           lines.push(`• ${s}`);
+        }
+      }
+
+      return res.status(200).json({ ok: true, reply: lines.join("\n") });
+    }
+
+    if (isSearchCommand) {
+      const gt = await fetchLocalGeckoTerminalToken(req, searchAddress);
+
+      if (!gt) {
+        return res.status(200).json({ ok: true, reply: "Data not available." });
+      }
+
+      const token = gt.token || {};
+      const bestPool = gt.bestPool || null;
+      const p = bestPool && bestPool.attributes ? bestPool.attributes : {};
+
+      const lines = [];
+
+      const name = token.name ? String(token.name) : "Data not available";
+      const symbol = token.symbol ? String(token.symbol) : "Data not available";
+
+      lines.push(`🪙 Token: ${name} (${symbol})`);
+      if (token.price_usd !== null && token.price_usd !== undefined && String(token.price_usd).trim() !== "") {
+        lines.push(`💵 Price (USD): ${String(token.price_usd)}`);
+      }
+
+      const ch24 =
+        token.price_change_percentage && typeof token.price_change_percentage === "object"
+          ? token.price_change_percentage.h24
+          : null;
+
+      if (ch24 !== null && ch24 !== undefined && String(ch24).trim() !== "") {
+        lines.push(`📈 24h Change (%): ${String(ch24)}`);
+      }
+
+      if (token.market_cap_usd !== null && token.market_cap_usd !== undefined && String(token.market_cap_usd).trim() !== "") {
+        lines.push(`🏦 MCap (USD): ${String(token.market_cap_usd)}`);
+      }
+
+      if (token.fdv_usd !== null && token.fdv_usd !== undefined && String(token.fdv_usd).trim() !== "") {
+        lines.push(`📊 FDV (USD): ${String(token.fdv_usd)}`);
+      }
+
+      if (bestPool && bestPool.id) {
+        lines.push("");
+        lines.push("🔁 Best Pool");
+        lines.push(`• Pool: ${String(bestPool.id)}`);
+
+        if (p.reserve_in_usd !== null && p.reserve_in_usd !== undefined && String(p.reserve_in_usd).trim() !== "") {
+          lines.push(`• Liquidity (USD): ${String(p.reserve_in_usd)}`);
+        }
+
+        const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
+        if (v24 !== null && v24 !== undefined && String(v24).trim() !== "") {
+          lines.push(`• Volume 24h (USD): ${String(v24)}`);
         }
       }
 
