@@ -195,7 +195,8 @@ export default async function handler(req, res) {
 
     const systemText =
       "You are an assistant for a Base Mini Scan. " +
-      "respond to questions according to the language used. ";
+      "respond to questions according to the language used. " +
+      "You are a crypto assistant.If price data is provided in coingecko, you MUST use it.Never say you cannot provide real-time data if coingecko data exists.Mention that data is cached / near real-time if needed. ";
 
     const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
 
