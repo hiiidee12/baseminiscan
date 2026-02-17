@@ -3,13 +3,8 @@ const GEMINI_KEYS = [
   process.env.GEMINI_API_KEY_2,
 ].filter(Boolean);
 
-let __geminiKeyIndex = 0;
-
-function pickGeminiKey() {
-  if (!GEMINI_KEYS.length) return null;
-  const k = GEMINI_KEYS[__geminiKeyIndex % GEMINI_KEYS.length];
-  __geminiKeyIndex = (__geminiKeyIndex + 1) % GEMINI_KEYS.length;
-  return k;
+function getAvailableKeys() {
+  return [...GEMINI_KEYS].sort(() => Math.random() - 0.5);
 }
 
 async function callGeminiWithRotation({ model, contents, temperature, maxOutputTokens }) {
@@ -17,40 +12,44 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-  let last = { ok: false, status: 0, json: null };
+  const keysToTry = getAvailableKeys();
+  let lastError = { ok: false, status: 0, json: null };
 
-  for (let attempt = 0; attempt < GEMINI_KEYS.length; attempt++) {
-    const apiKey = pickGeminiKey();
+  for (const apiKey of keysToTry) {
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents,
+          generationConfig: { temperature, maxOutputTokens },
+        }),
+      });
 
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents,
-        generationConfig: { temperature, maxOutputTokens },
-      }),
-    });
+      const j = await r.json().catch(() => null);
 
-    const j = await r.json().catch(() => null);
+      if (r.ok) return { ok: true, status: r.status, json: j };
 
-    if (r.ok) return { ok: true, status: r.status, json: j };
+      if (r.status === 429 || r.status === 503 || r.status === 500) {
+        lastError = { ok: false, status: r.status, json: j };
+        continue;
+      }
 
-    if (r.status === 429 || r.status === 503) {
-      last = { ok: false, status: r.status, json: j };
+      return { ok: false, status: r.status, json: j };
+    } catch (e) {
+      lastError = { ok: false, status: 0, json: { error: e.message } };
       continue;
     }
-
-    return { ok: false, status: r.status, json: j };
   }
 
-  return last;
+  return lastError;
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", "no-store, max-age=0");
 
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -66,35 +65,24 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // ===== deterministic scan output =====
     const address = (context && typeof context === "object" && context.address) || null;
 
     if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
       const farcasterUsername = (context && context.farcasterUsername) || null;
-
-      const neynarScoreRaw =
-        context && context.neynarScore !== undefined ? context.neynarScore : null;
-
-      const balanceEthRaw =
-        context && context.balanceEth !== undefined ? context.balanceEth : null;
-
-      const balanceWeiRaw =
-        context && context.balanceWei !== undefined ? context.balanceWei : null;
-
-      const txCountRaw =
-        context && context.txCount !== undefined ? context.txCount : null;
+      const neynarScoreRaw = context?.neynarScore !== undefined ? context.neynarScore : null;
+      const balanceEthRaw = context?.balanceEth !== undefined ? context.balanceEth : null;
+      const balanceWeiRaw = context?.balanceWei !== undefined ? context.balanceWei : null;
 
       const safeFarcaster = farcasterUsername ? String(farcasterUsername) : "Data not available";
 
-      const safeNeynar =
-        neynarScoreRaw === null || neynarScoreRaw === undefined || neynarScoreRaw === ""
-          ? "Data not available"
-          : String(neynarScoreRaw);
+      const safeNeynar = (neynarScoreRaw === null || neynarScoreRaw === "")
+        ? "Data not available"
+        : String(neynarScoreRaw);
 
       let safeBalance = "Data not available";
       if (balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "") {
         safeBalance = `${String(balanceEthRaw)} ETH`;
-      } else if (balanceWeiRaw !== null && balanceWeiRaw !== undefined) {
+      } else if (balanceWeiRaw !== null && balanceWeiRaw !== undefined && balanceWeiRaw !== "") {
         try {
           const w = BigInt(String(balanceWeiRaw));
           const base = 10n ** 18n;
@@ -102,21 +90,17 @@ export default async function handler(req, res) {
           const fracPart = w % base;
           const frac6 = (fracPart / 10n ** 12n).toString().padStart(6, "0");
           safeBalance = `${intPart.toString()}.${frac6} ETH`;
-        } catch {}
+        } catch (e) {
+          console.error("Wei conversion error:", e);
+        }
       }
-
-      const safeTx =
-        txCountRaw === null || txCountRaw === undefined || txCountRaw === ""
-          ? "Data not available"
-          : String(txCountRaw);
 
       const lines = [
         `💳 Farcaster: ${safeFarcaster}`,
-        `🧬 Neynar: ${safeNeynar}`,
+        `🧬 Neynar Score: ${safeNeynar}`,
         `💰 Balance: ${safeBalance}`,
       ];
 
-      // ===== summary (deterministic) =====
       const toNum = (v) => {
         if (v === null || v === undefined || v === "") return null;
         const n = Number(v);
@@ -124,45 +108,26 @@ export default async function handler(req, res) {
       };
 
       const neynarScoreNum = toNum(neynarScoreRaw);
-      const balanceEthNum = toNum(balanceEthRaw);
-      const txCountNum = toNum(txCountRaw);
 
-      // parse balance from wei if balanceEth missing
-      let balanceEthParsed = balanceEthNum;
-      if (
-        (balanceEthParsed === null || balanceEthParsed === undefined) &&
-        balanceWeiRaw !== null &&
-        balanceWeiRaw !== undefined &&
-        balanceWeiRaw !== ""
-      ) {
+      let balanceEthNum = toNum(balanceEthRaw);
+      if ((balanceEthNum === null) && balanceWeiRaw) {
         try {
           const w = BigInt(String(balanceWeiRaw));
           const base = 10n ** 18n;
-          const intPart = w / base;
-          const fracPart = w % base;
-          // keep 6 decimals for numeric comparison
-          const frac6 = Number(fracPart / 10n ** 12n) / 1e6; // 0..0.999999
-          balanceEthParsed = Number(intPart) + frac6;
+          const intPart = Number(w / base);
+          const fracPart = Number(w % base);
+          balanceEthNum = intPart + (fracPart / Number(base));
         } catch {}
       }
 
       const summary = [];
 
-      // Activity level (TX)
-      if (txCountNum !== null) {
-        if (txCountNum >= 500) summary.push("High transaction activity");
-        else if (txCountNum >= 100) summary.push("Moderate transaction activity");
-        else summary.push("Low transaction activity");
-      }
-
-      // Balance level
-      if (balanceEthParsed !== null && balanceEthParsed !== undefined) {
-        if (balanceEthParsed < 0.001) summary.push("Low retained balance");
-        else if (balanceEthParsed < 0.01) summary.push("Modest retained balance");
+      if (balanceEthNum !== null) {
+        if (balanceEthNum < 0.001) summary.push("Low retained balance");
+        else if (balanceEthNum < 0.01) summary.push("Modest retained balance");
         else summary.push("Meaningful retained balance");
       }
 
-      // Social (Neynar) as soft signal
       if (neynarScoreNum !== null) {
         if (neynarScoreNum >= 0.75) summary.push("Strong social signal");
         else if (neynarScoreNum >= 0.5) summary.push("Average social signal");
@@ -170,20 +135,15 @@ export default async function handler(req, res) {
       }
 
       if (summary.length) {
-        lines.push("");
-        lines.push("🧠 Summary");
-        for (const s of summary) {
-          lines.push(`• ${s}`);
-        }
+        lines.push("", "🧠 Analysis Summary");
+        summary.forEach(s => lines.push(`• ${s}`));
       }
-      // ===== END summary =====
 
-      return res.status(200).json({ ok: true, reply: lines.join("\n") });
+      return res.status(200).json({ ok: true, reply: lines.join("\n"), type: "scan_result" });
     }
 
-    // ===== Gemini for non-scan questions (ROTATING KEYS) =====
     if (!GEMINI_KEYS.length) {
-      return res.status(200).json({ ok: true, reply: "Data not available." });
+      return res.status(200).json({ ok: true, reply: "AI service currently unavailable.", type: "error" });
     }
 
     const safeMessage = message.slice(0, 3000);
@@ -193,20 +153,19 @@ export default async function handler(req, res) {
       parts: [{ text: String(m?.text || "").slice(0, 2000) }],
     }));
 
-    const systemText =
+    const systemInstruction =
       "You are an assistant for a Base Mini Scan. " +
-      "respond to questions according to the language used. " +
-      "You are a crypto assistant.If price data is provided in coingecko, you MUST use it.Never say you cannot provide real-time data if coingecko data exists.Mention that data is cached / near real-time if needed. " +
-      "never say (Coingecko, near real-time) on your chat. ";
-
-    const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
+      "Respond in the same language as the user (English or Indonesian). " +
+      "You are a crypto expert. If price/data is provided in context, use it strictly. " +
+      "Do not mention 'Coingecko' or 'cached' explicitly unless asked. " +
+      "Keep answers concise and factual.";
 
     const contents = [
       ...trimmedHistory,
-      { role: "user", parts: [{ text: `${systemText}\n\n${userPrompt}` }] },
+      { role: "user", parts: [{ text: `${systemInstruction}\n\nUser Question: ${safeMessage}` }] },
     ];
 
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash-exp";
 
     const out = await callGeminiWithRotation({
       model,
@@ -216,17 +175,17 @@ export default async function handler(req, res) {
     });
 
     if (!out.ok) {
-      return res.status(200).json({ ok: true, reply: "Data not available." });
+      console.warn(`Gemini API failed: ${out.status}`);
+      return res.status(200).json({ ok: true, reply: "Unable to process AI request at this moment.", type: "error" });
     }
 
-    const j = out.json;
-
     const reply =
-      j?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
-      "Data not available.";
+      out.json?.candidates?.[0]?.content?.parts?.map((p) => p?.text || "").join("").trim() ||
+      "No response generated.";
 
-    return res.status(200).json({ ok: true, reply });
-  } catch {
-    return res.status(200).json({ ok: true, reply: "Data not available." });
+    return res.status(200).json({ ok: true, reply, type: "ai_response" });
+  } catch (err) {
+    console.error("Handler error:", err);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 }
