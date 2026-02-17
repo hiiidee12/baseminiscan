@@ -314,7 +314,7 @@ export default async function handler(req, res) {
       model,
       contents,
       temperature: 0.2,
-      maxOutputTokens: 750,
+      maxOutputTokens: 250,
     });
 
     if (!out.ok) {
