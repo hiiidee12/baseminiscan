@@ -68,7 +68,6 @@ async function __fetchExplorerContext(address) {
 
     return {
       address,
-      // explorer
       balanceWei: __pickBalanceWei(addrJson),
       txCount: __pickTxCount(addrJson),
       sampleTx: list.map((x) => ({
@@ -78,12 +77,64 @@ async function __fetchExplorerContext(address) {
         value: x.value,
         hash: x.hash,
       })),
-      // farcaster (from /api/farcaster)
       farcasterUsername: fcJson?.username ?? null,
       neynarScore: fcJson?.neynarScore ?? null,
     };
   } catch {
     return { address };
+  }
+}
+
+async function __fetchCoinGeckoContext(text) {
+  try {
+    const q = String(text || "").toLowerCase();
+
+    const wantGlobal =
+      q.includes("market") ||
+      q.includes("dominance") ||
+      q.includes("btc dominance") ||
+      q.includes("total market");
+
+    const wantPrice =
+      q.includes("harga") ||
+      q.includes("price") ||
+      q.includes("berapa") ||
+      q.includes("$") ||
+      q.includes("usd") ||
+      q.includes("idr");
+
+    const jobs = [];
+
+    if (wantPrice) {
+      jobs.push(
+        fetch(
+          `/api/coingecko?endpoint=simple_price&ids=bitcoin,ethereum&vs_currencies=usd,idr&include_24hr_change=1&include_market_cap=1&include_24hr_vol=1`,
+          { cache: "no-store" }
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      );
+    } else {
+      jobs.push(Promise.resolve(null));
+    }
+
+    if (wantGlobal) {
+      jobs.push(
+        fetch(`/api/coingecko?endpoint=global`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      );
+    } else {
+      jobs.push(Promise.resolve(null));
+    }
+
+    const [price, global] = await Promise.all(jobs);
+
+    if (!price && !global) return null;
+
+    return { price, global };
+  } catch {
+    return null;
   }
 }
 
@@ -110,6 +161,7 @@ async function __aiSendNow() {
 
   const address = __extractAddress(text);
   const context = address ? await __fetchExplorerContext(address) : null;
+  const coingecko = await __fetchCoinGeckoContext(text);
 
   const history = __aiMessages
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -120,7 +172,7 @@ async function __aiSendNow() {
     const r = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, context, history }),
+      body: JSON.stringify({ message: text, context, coingecko, history }),
     });
 
     const j = await r.json().catch(() => null);
