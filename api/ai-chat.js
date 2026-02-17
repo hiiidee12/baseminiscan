@@ -49,6 +49,108 @@ async function callGeminiWithRotation({ model, contents, temperature, maxOutputT
   return last;
 }
 
+function __fmtNum(v, digits) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  if (typeof digits === "number") return n.toFixed(digits);
+  return String(n);
+}
+
+function __buildCoinGeckoText(coingecko) {
+  try {
+    if (!coingecko || typeof coingecko !== "object") return "";
+
+    const price = coingecko.price && typeof coingecko.price === "object" ? coingecko.price : null;
+    const global = coingecko.global && typeof coingecko.global === "object" ? coingecko.global : null;
+
+    const lines = [];
+
+    if (price && typeof price === "object") {
+      const eth = price.ethereum && typeof price.ethereum === "object" ? price.ethereum : null;
+      const btc = price.bitcoin && typeof price.bitcoin === "object" ? price.bitcoin : null;
+
+      if (eth) {
+        const ethUsd = __fmtNum(eth.usd, 2);
+        const ethIdr = __fmtNum(eth.idr, 0);
+        const ethCh = __fmtNum(eth.usd_24h_change, 2);
+        const ethMc = __fmtNum(eth.usd_market_cap, 0);
+        const ethVol = __fmtNum(eth.usd_24h_vol, 0);
+
+        const parts = [];
+        if (ethUsd !== null) parts.push(`ETH_USD=${ethUsd}`);
+        if (ethIdr !== null) parts.push(`ETH_IDR=${ethIdr}`);
+        if (ethCh !== null) parts.push(`ETH_24H_CHANGE_PCT=${ethCh}`);
+        if (ethMc !== null) parts.push(`ETH_MKTCAP_USD=${ethMc}`);
+        if (ethVol !== null) parts.push(`ETH_VOL_24H_USD=${ethVol}`);
+
+        if (parts.length) {
+          lines.push("PRICE_DATA");
+          lines.push(parts.join(" | "));
+        }
+      }
+
+      if (btc) {
+        const btcUsd = __fmtNum(btc.usd, 2);
+        const btcIdr = __fmtNum(btc.idr, 0);
+        const btcCh = __fmtNum(btc.usd_24h_change, 2);
+        const btcMc = __fmtNum(btc.usd_market_cap, 0);
+        const btcVol = __fmtNum(btc.usd_24h_vol, 0);
+
+        const parts = [];
+        if (btcUsd !== null) parts.push(`BTC_USD=${btcUsd}`);
+        if (btcIdr !== null) parts.push(`BTC_IDR=${btcIdr}`);
+        if (btcCh !== null) parts.push(`BTC_24H_CHANGE_PCT=${btcCh}`);
+        if (btcMc !== null) parts.push(`BTC_MKTCAP_USD=${btcMc}`);
+        if (btcVol !== null) parts.push(`BTC_VOL_24H_USD=${btcVol}`);
+
+        if (parts.length) {
+          if (!lines.length) lines.push("PRICE_DATA");
+          lines.push(parts.join(" | "));
+        }
+      }
+    }
+
+    if (global && typeof global === "object") {
+      const data = global.data && typeof global.data === "object" ? global.data : null;
+
+      if (data) {
+        const tmc = data.total_market_cap && typeof data.total_market_cap === "object" ? data.total_market_cap : null;
+        const tv = data.total_volume && typeof data.total_volume === "object" ? data.total_volume : null;
+        const mpp = data.market_cap_percentage && typeof data.market_cap_percentage === "object" ? data.market_cap_percentage : null;
+
+        const parts = [];
+
+        if (tmc) {
+          const tmcUsd = __fmtNum(tmc.usd, 0);
+          if (tmcUsd !== null) parts.push(`TOTAL_MKTCAP_USD=${tmcUsd}`);
+        }
+
+        if (tv) {
+          const tvUsd = __fmtNum(tv.usd, 0);
+          if (tvUsd !== null) parts.push(`TOTAL_VOL_24H_USD=${tvUsd}`);
+        }
+
+        if (mpp) {
+          const btcDom = __fmtNum(mpp.btc, 2);
+          const ethDom = __fmtNum(mpp.eth, 2);
+          if (btcDom !== null) parts.push(`BTC_DOMINANCE_PCT=${btcDom}`);
+          if (ethDom !== null) parts.push(`ETH_DOMINANCE_PCT=${ethDom}`);
+        }
+
+        if (parts.length) {
+          lines.push("GLOBAL_DATA");
+          lines.push(parts.join(" | "));
+        }
+      }
+    }
+
+    if (!lines.length) return "";
+    return lines.join("\n");
+  } catch {
+    return "";
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -60,13 +162,13 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const message = String(body.message || "").trim();
     const context = body.context ?? null;
+    const coingecko = body.coingecko ?? null;
     const history = Array.isArray(body.history) ? body.history : [];
 
     if (!message) {
       return res.status(400).json({ ok: false, error: "Missing message" });
     }
 
-    // ===== deterministic scan output =====
     const address = (context && typeof context === "object" && context.address) || null;
 
     if (address && /^0x[a-fA-F0-9]{40}$/.test(String(address))) {
@@ -116,7 +218,6 @@ export default async function handler(req, res) {
         `💰 Balance: ${safeBalance}`,
       ];
 
-      // ===== summary (deterministic) =====
       const toNum = (v) => {
         if (v === null || v === undefined || v === "") return null;
         const n = Number(v);
@@ -127,7 +228,6 @@ export default async function handler(req, res) {
       const balanceEthNum = toNum(balanceEthRaw);
       const txCountNum = toNum(txCountRaw);
 
-      // parse balance from wei if balanceEth missing
       let balanceEthParsed = balanceEthNum;
       if (
         (balanceEthParsed === null || balanceEthParsed === undefined) &&
@@ -140,29 +240,25 @@ export default async function handler(req, res) {
           const base = 10n ** 18n;
           const intPart = w / base;
           const fracPart = w % base;
-          // keep 6 decimals for numeric comparison
-          const frac6 = Number(fracPart / 10n ** 12n) / 1e6; // 0..0.999999
+          const frac6 = Number(fracPart / 10n ** 12n) / 1e6;
           balanceEthParsed = Number(intPart) + frac6;
         } catch {}
       }
 
       const summary = [];
 
-      // Activity level (TX)
       if (txCountNum !== null) {
         if (txCountNum >= 500) summary.push("High transaction activity");
         else if (txCountNum >= 100) summary.push("Moderate transaction activity");
         else summary.push("Low transaction activity");
       }
 
-      // Balance level
       if (balanceEthParsed !== null && balanceEthParsed !== undefined) {
         if (balanceEthParsed < 0.001) summary.push("Low retained balance");
         else if (balanceEthParsed < 0.01) summary.push("Modest retained balance");
         else summary.push("Meaningful retained balance");
       }
 
-      // Social (Neynar) as soft signal
       if (neynarScoreNum !== null) {
         if (neynarScoreNum >= 0.75) summary.push("Strong social signal");
         else if (neynarScoreNum >= 0.5) summary.push("Average social signal");
@@ -176,12 +272,10 @@ export default async function handler(req, res) {
           lines.push(`• ${s}`);
         }
       }
-      // ===== END summary =====
 
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
-    // ===== Gemini for non-scan questions (ROTATING KEYS) =====
     if (!GEMINI_KEYS.length) {
       return res.status(200).json({ ok: true, reply: "Data not available." });
     }
@@ -193,13 +287,21 @@ export default async function handler(req, res) {
       parts: [{ text: String(m?.text || "").slice(0, 2000) }],
     }));
 
+    const cgText = __buildCoinGeckoText(coingecko);
+
     const systemText =
       "You are an assistant for a Base Mini Scan. " +
       "respond to questions according to the language used. " +
-      "You are a crypto assistant.If price data is provided in coingecko, you MUST use it.Never say you cannot provide real-time data if coingecko data exists.Mention that data is cached / near real-time if needed. " +
-      "never say (Coingecko, near real-time) on your chat. ";
+      "You are a crypto assistant. " +
+      "If price data is provided below, you MUST use it and treat it as the source of truth for prices. " +
+      "Never say you cannot provide real-time data if price data exists. " +
+      "Keep answers short. No hype. " +
+      "Do not mention the data provider name.";
 
-    const userPrompt = `User message:\n${safeMessage}\n\nRules:\n- Short answer\n- No hype`;
+    const userPrompt =
+      `User message:\n${safeMessage}\n\n` +
+      (cgText ? `Price/market data:\n${cgText}\n\n` : "") +
+      `Rules:\n- Short answer\n- No hype`;
 
     const contents = [
       ...trimmedHistory,
