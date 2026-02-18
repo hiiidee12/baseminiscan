@@ -226,7 +226,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (__aiMessages.length === 0) {
   __aiAdd(
     "assistant",
-    "Commands:\nscan 0x... → wallet analysis\nsearch 0x... → address, token, or tx"
+    "Commands:\nscan 0x... → wallet analysis\nsearch 0x... → token info"
   );
   }
 });
