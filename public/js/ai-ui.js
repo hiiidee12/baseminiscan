@@ -224,6 +224,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   if (__aiMessages.length === 0) {
-    __aiAdd("assistant", "🤖: welcome to BMS AI assistant.");
+    __aiAdd("assistant", "➡️ use scan 0x.. ,search 0x.. for main comand.");
   }
 });
