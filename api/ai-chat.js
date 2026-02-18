@@ -446,7 +446,7 @@ export default async function handler(req, res) {
       { role: "user", content: userPrompt },
     ];
 
-    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-5.2";
 
     const out = await callGeminiWithRotation({
       model,
