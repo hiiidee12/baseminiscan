@@ -391,7 +391,6 @@ export default async function handler(req, res) {
       if (bestPool && bestPool.id) {
         lines.push("");
         lines.push("🔁 Best Pool");
-        lines.push(`• Pool: ${String(bestPool.id)}`);
 
         if (p.reserve_in_usd !== null && p.reserve_in_usd !== undefined && String(p.reserve_in_usd).trim() !== "") {
           lines.push(`• Liquidity (USD): ${String(p.reserve_in_usd)}`);
