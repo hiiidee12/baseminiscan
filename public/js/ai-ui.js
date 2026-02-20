@@ -103,11 +103,14 @@ function __startMultisendStream({ userId, amountEth, toList }) {
     }
   });
 
-  es.addEventListener("done", () => {
-    __aiAdd("assistant", "✅ All Done.");
-    es.close();
-  });
-
+  es.addEventListener("done", (e) => {
+  const d = e?.data ? JSON.parse(e.data) : {};
+  __aiAdd(
+    "assistant",
+    `🎉 All Done\n• Success: ${d.success ?? 0}\n• Failed: ${d.failed ?? 0}\n• Total ETH: ${d.totalSentEth ?? "0"}`
+  );
+  es.close();
+});
   es.addEventListener("error", (e) => {
     try {
       const d = e?.data ? JSON.parse(e.data) : null;
