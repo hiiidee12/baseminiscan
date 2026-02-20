@@ -214,6 +214,32 @@ async function fetchLocalGeckoTerminalToken(req, tokenAddress) {
   return j.data || null;
 }
 
+function __getBaseUrl(req) {
+  const proto =
+    (req.headers["x-forwarded-proto"] || "https").toString().split(",")[0].trim();
+  const host =
+    (req.headers["x-forwarded-host"] || req.headers.host || "").toString().split(",")[0].trim();
+  return host ? `${proto}://${host}` : "";
+}
+
+function __parseSendCommand(text) {
+  const t = String(text || "").trim();
+  const m = t.match(/^(send|multisend)\s+([0-9]*\.?[0-9]+)\s+(to|->)\s+(.+)$/i);
+  if (!m) return null;
+
+  const amountEth = m[2];
+  const raw = m[4]
+    .replace(/,/g, " ")
+    .split(" ")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  const addrs = raw.filter((x) => /^0x[a-fA-F0-9]{40}$/.test(x));
+  if (!addrs.length) return null;
+
+  return addrs.map((to) => ({ to, amountEth }));
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -230,6 +256,65 @@ export default async function handler(req, res) {
 
     if (!message) {
       return res.status(400).json({ ok: false, error: "Missing message" });
+    }
+
+    const baseUrl = __getBaseUrl(req);
+    const userId =
+      body.userId ||
+      (context && context.fid) ||
+      (context && context.address) ||
+      "anon";
+
+    if (/^(wallet|mywallet|address)\b/i.test(message)) {
+      const r = await fetch(
+        `${baseUrl}/api/ai-wallet?userId=${encodeURIComponent(userId)}`
+      );
+      const j = await r.json().catch(() => null);
+
+      if (!j || !j.ok) {
+        return res.status(200).json({
+          ok: true,
+          reply: "Failed to load AI wallet.",
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        reply: `🤖 AI Wallet\n${j.address}\n(created: ${j.created ? "yes" : "no"})`,
+      });
+    }
+
+    const recipients = __parseSendCommand(message);
+    if (recipients) {
+      const r = await fetch(`${baseUrl}/api/ai-multisend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, recipients }),
+      });
+
+      const j = await r.json().catch(() => null);
+
+      if (!j || !j.ok) {
+        return res.status(200).json({
+          ok: true,
+          reply: `Send failed: ${j?.error || "unknown error"}`,
+        });
+      }
+
+      const lines = [];
+      lines.push(`🚀 Multisend executed`);
+      lines.push(`From: ${j.from}`);
+      lines.push(`Count: ${j.count}`);
+
+      for (const it of j.results || []) {
+        lines.push(`→ ${it.to} (${it.amountEth} ETH)`);
+        lines.push(`Tx: ${it.hash}`);
+      }
+
+      return res.status(200).json({
+        ok: true,
+        reply: lines.join("\n"),
+      });
     }
 
     const msgLower = message.toLowerCase();
@@ -367,87 +452,87 @@ export default async function handler(req, res) {
       const symbol = token.symbol ? String(token.symbol) : "Data not available";
 
       function formatNumber(n, decimals = 2) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return null;
+        const x = Number(n);
+        if (!Number.isFinite(x)) return null;
 
-  const abs = Math.abs(x);
-  if (abs >= 1e9) return (x / 1e9).toFixed(decimals).replace(/\.0+$/, "") + "B";
-  if (abs >= 1e6) return (x / 1e6).toFixed(decimals).replace(/\.0+$/, "") + "M";
-  if (abs >= 1e3) return (x / 1e3).toFixed(decimals).replace(/\.0+$/, "") + "K";
-  return x.toLocaleString("en-US");
-}
+        const abs = Math.abs(x);
+        if (abs >= 1e9) return (x / 1e9).toFixed(decimals).replace(/\.0+$/, "") + "B";
+        if (abs >= 1e6) return (x / 1e6).toFixed(decimals).replace(/\.0+$/, "") + "M";
+        if (abs >= 1e3) return (x / 1e3).toFixed(decimals).replace(/\.0+$/, "") + "K";
+        return x.toLocaleString("en-US");
+      }
 
-function formatPrice(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return n;
+      function formatPrice(n) {
+        const x = Number(n);
+        if (!Number.isFinite(x)) return n;
 
-  if (x >= 1) return x.toFixed(4).replace(/\.?0+$/, "");
-  if (x >= 0.1) return x.toFixed(4).replace(/\.?0+$/, "");
-  if (x >= 0.01) return x.toFixed(5).replace(/\.?0+$/, "");
-  if (x >= 0.001) return x.toFixed(6).replace(/\.?0+$/, "");
-  return x.toPrecision(4);
-}
+        if (x >= 1) return x.toFixed(4).replace(/\.?0+$/, "");
+        if (x >= 0.1) return x.toFixed(4).replace(/\.?0+$/, "");
+        if (x >= 0.01) return x.toFixed(5).replace(/\.?0+$/, "");
+        if (x >= 0.001) return x.toFixed(6).replace(/\.?0+$/, "");
+        return x.toPrecision(4);
+      }
 
-function hasValue(v) {
-  return v !== null && v !== undefined && String(v).trim() !== "";
-}
+      function hasValue(v) {
+        return v !== null && v !== undefined && String(v).trim() !== "";
+      }
 
-const colorizePct = (x) => {
-  const v = Number(x);
-  if (!Number.isFinite(v)) return String(x);
+      const colorizePct = (x) => {
+        const v = Number(x);
+        if (!Number.isFinite(v)) return String(x);
 
-  const s = v.toFixed(2).replace(/\.0+$/, "");
-  if (v > 0) return ` +${s}%`;
-  if (v < 0) return ` ${s}%`;
-  return ` ${s}%`;
-};
+        const s = v.toFixed(2).replace(/\.0+$/, "");
+        if (v > 0) return ` +${s}%`;
+        if (v < 0) return ` ${s}%`;
+        return ` ${s}%`;
+      };
 
-lines.push(`🪙 Token: ${name} (${symbol})`);
+      lines.push(`🪙 Token: ${name} (${symbol})`);
 
-if (hasValue(token.price_usd)) {
-  lines.push(`💵 Price : $${formatPrice(token.price_usd)}`);
-}
+      if (hasValue(token.price_usd)) {
+        lines.push(`💵 Price : $${formatPrice(token.price_usd)}`);
+      }
 
-const ch1 = token.price_change_1h_pct ?? null;
-const ch6 = token.price_change_6h_pct ?? null;
-const ch12 = token.price_change_12h_pct ?? null;
-const ch24 = token.price_change_24h_pct ?? null;
+      const ch1 = token.price_change_1h_pct ?? null;
+      const ch6 = token.price_change_6h_pct ?? null;
+      const ch12 = token.price_change_12h_pct ?? null;
+      const ch24 = token.price_change_24h_pct ?? null;
 
-if (hasValue(ch1) || hasValue(ch6) || hasValue(ch12) || hasValue(ch24)) {
-  const parts = [];
-  if (hasValue(ch1)) parts.push(`1h:${colorizePct(ch1)}`);
-  if (hasValue(ch6)) parts.push(`6h:${colorizePct(ch6)}`);
-  if (hasValue(ch12)) parts.push(`12h:${colorizePct(ch12)}`);
-  if (hasValue(ch24)) parts.push(`24h:${colorizePct(ch24)}`);
+      if (hasValue(ch1) || hasValue(ch6) || hasValue(ch12) || hasValue(ch24)) {
+        const parts = [];
+        if (hasValue(ch1)) parts.push(`1h:${colorizePct(ch1)}`);
+        if (hasValue(ch6)) parts.push(`6h:${colorizePct(ch6)}`);
+        if (hasValue(ch12)) parts.push(`12h:${colorizePct(ch12)}`);
+        if (hasValue(ch24)) parts.push(`24h:${colorizePct(ch24)}`);
 
-  lines.push(`${parts.join(" | ")}`);
-}
+        lines.push(`${parts.join(" | ")}`);
+      }
 
-if (hasValue(token.market_cap_usd)) {
-  const s = formatNumber(token.market_cap_usd, 2);
-  lines.push(`🏦 MCap : $${s ?? String(token.market_cap_usd)}`);
-}
+      if (hasValue(token.market_cap_usd)) {
+        const s = formatNumber(token.market_cap_usd, 2);
+        lines.push(`🏦 MCap : $${s ?? String(token.market_cap_usd)}`);
+      }
 
-if (hasValue(token.fdv_usd)) {
-  const s = formatNumber(token.fdv_usd, 2);
-  lines.push(`📊 FDV : $${s ?? String(token.fdv_usd)}`);
-}
+      if (hasValue(token.fdv_usd)) {
+        const s = formatNumber(token.fdv_usd, 2);
+        lines.push(`📊 FDV : $${s ?? String(token.fdv_usd)}`);
+      }
 
-if (bestPool && bestPool.id) {
-  lines.push("");
-  lines.push("🔁 Best Pool");
+      if (bestPool && bestPool.id) {
+        lines.push("");
+        lines.push("🔁 Best Pool");
 
-  if (hasValue(p.reserve_in_usd)) {
-    const s = formatNumber(p.reserve_in_usd, 2);
-    lines.push(`• Liquidity : $${s ?? String(p.reserve_in_usd)}`);
-  }
+        if (hasValue(p.reserve_in_usd)) {
+          const s = formatNumber(p.reserve_in_usd, 2);
+          lines.push(`• Liquidity : $${s ?? String(p.reserve_in_usd)}`);
+        }
 
-  const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
-  if (hasValue(v24)) {
-    const s = formatNumber(v24, 2);
-    lines.push(`• Volume 24h : $${s ?? String(v24)}`);
-  }
-}
+        const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
+        if (hasValue(v24)) {
+          const s = formatNumber(v24, 2);
+          lines.push(`• Volume 24h : $${s ?? String(v24)}`);
+        }
+      }
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
