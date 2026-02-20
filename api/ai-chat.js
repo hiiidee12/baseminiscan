@@ -260,11 +260,38 @@ export default async function handler(req, res) {
 
     const baseUrl = __getBaseUrl(req);
     const userId =
-      body.userId ||
-      (context && context.fid) ||
-      (context && context.address) ||
-      "anon";
+  body.userId ||
+  (context && context.fid && `fc:${context.fid}`) ||
+  (context && context.address && `addr:${String(context.address).toLowerCase()}`) ||
+  "anon";
 
+      if (!userId || String(userId).trim() === "" || userId === "anon") {
+  return res.status(200).json({ ok: true, reply: "User not verified." });
+}
+
+const fid = context && context.fid ? String(context.fid) : null;
+const username = context && context.farcasterUsername ? String(context.farcasterUsername) : null;
+const neynarScore =
+  context && context.neynarScore !== undefined && context.neynarScore !== null
+    ? String(context.neynarScore)
+    : null;
+
+if (/^(who am i|siapa saya)\b/i.test(message)) {
+  const lines = [];
+  if (fid) lines.push(`FID: ${fid}`);
+  if (username) lines.push(`Username: @${username}`);
+  if (neynarScore) lines.push(`Neynar: ${neynarScore}`);
+  if (!lines.length) lines.push("Data not available.");
+  return res.status(200).json({ ok: true, reply: lines.join("\n") });
+}
+
+if (/(neynar|score)\b/i.test(message) && neynarScore) {
+  return res.status(200).json({ ok: true, reply: `Neynar: ${neynarScore}` });
+}
+
+if (/\bfid\b/i.test(message) && fid) {
+  return res.status(200).json({ ok: true, reply: `FID: ${fid}` });
+}
     if (/^(wallet|mywallet|address)\b/i.test(message)) {
       const r = await fetch(
         `${baseUrl}/api/ai-wallet?userId=${encodeURIComponent(userId)}`
