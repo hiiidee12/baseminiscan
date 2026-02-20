@@ -368,7 +368,7 @@ export default async function handler(req, res) {
 
       lines.push(`🪙 Token: ${name} (${symbol})`);
       if (token.price_usd !== null && token.price_usd !== undefined && String(token.price_usd).trim() !== "") {
-        lines.push(`💵 Price (USD): $ ${String(token.price_usd)}`);
+        lines.push(`💵 Price : $ ${String(token.price_usd)}`);
       }
 
       const ch24 =
@@ -381,11 +381,11 @@ export default async function handler(req, res) {
       }
 
       if (token.market_cap_usd !== null && token.market_cap_usd !== undefined && String(token.market_cap_usd).trim() !== "") {
-        lines.push(`🏦 MCap (USD): $ ${String(token.market_cap_usd)}`);
+        lines.push(`🏦 MCap : $ ${String(token.market_cap_usd)}`);
       }
 
       if (token.fdv_usd !== null && token.fdv_usd !== undefined && String(token.fdv_usd).trim() !== "") {
-        lines.push(`📊 FDV (USD): $ ${String(token.fdv_usd)}`);
+        lines.push(`📊 FDV : $ ${String(token.fdv_usd)}`);
       }
 
       if (bestPool && bestPool.id) {
@@ -393,12 +393,12 @@ export default async function handler(req, res) {
         lines.push("🔁 Best Pool");
 
         if (p.reserve_in_usd !== null && p.reserve_in_usd !== undefined && String(p.reserve_in_usd).trim() !== "") {
-          lines.push(`• Liquidity (USD): $ ${String(p.reserve_in_usd)}`);
+          lines.push(`• Liquidity : $ ${String(p.reserve_in_usd)}`);
         }
 
         const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
         if (v24 !== null && v24 !== undefined && String(v24).trim() !== "") {
-          lines.push(`• Volume 24h (USD): $ ${String(v24)}`);
+          lines.push(`• Volume 24h : $ ${String(v24)}`);
         }
       }
 
