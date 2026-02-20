@@ -397,8 +397,8 @@ const colorizePct = (x) => {
   if (!Number.isFinite(v)) return String(x);
 
   const s = v.toFixed(2).replace(/\.0+$/, "");
-  if (v > 0) return `🟢 +${s}%`;
-  if (v < 0) return `🔴 ${s}%`;
+  if (v > 0) return ` +${s}%`;
+  if (v < 0) return ` ${s}%`;
   return `⚪ ${s}%`;
 };
 
