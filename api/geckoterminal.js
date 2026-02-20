@@ -68,6 +68,8 @@ function pickBestPool(poolsJson) {
 
 function mapToken(tokenJson) {
   const a = tokenJson?.data?.attributes || {};
+  const pcp = a.price_change_percentage || {};
+
   return {
     name: a.name ?? null,
     symbol: a.symbol ?? null,
@@ -76,7 +78,38 @@ function mapToken(tokenJson) {
     fdv_usd: a.fdv_usd ?? null,
     market_cap_usd: a.market_cap_usd ?? null,
     volume_usd_24h: a.volume_usd?.h24 ?? null,
-    price_change_24h_pct: a.price_change_percentage?.h24 ?? null,
+
+    price_change_1h_pct: pcp?.h1 ?? null,
+    price_change_6h_pct: pcp?.h6 ?? null,
+    price_change_12h_pct: pcp?.h12 ?? null, // biasanya null
+    price_change_24h_pct: pcp?.h24 ?? null,
+  };
+}
+
+function calcPct(now, past) {
+  const n = Number(now);
+  const p = Number(past);
+  if (!Number.isFinite(n) || !Number.isFinite(p) || p === 0) return null;
+  return ((n - p) / p) * 100;
+}
+
+function getOhlcvCloseNowAndHoursAgo(ohlcvData, hoursAgo) {
+  const list =
+    ohlcvData?.attributes?.ohlcv_list ||
+    ohlcvData?.ohlcv_list ||
+    null;
+
+  if (!Array.isArray(list) || list.length < hoursAgo + 1) {
+    return { now: null, past: null };
+  }
+
+  // format: [timestamp, open, high, low, close, volume]
+  const latest = list[0];
+  const past = list[hoursAgo];
+
+  return {
+    now: Array.isArray(latest) ? latest[4] : null,
+    past: Array.isArray(past) ? past[4] : null,
   };
 }
 
@@ -114,6 +147,39 @@ export default async function handler(req, res) {
 
       const token = mapToken(tok.json);
       const bestPool = pls.ok ? pickBestPool(pls.json) : null;
+
+      // fallback 1h / 6h / 24h dari best pool
+      const poolPcp = bestPool?.attributes?.price_change_percentage || {};
+
+      if (token.price_change_1h_pct == null) {
+        token.price_change_1h_pct = poolPcp?.h1 ?? null;
+      }
+      if (token.price_change_6h_pct == null) {
+        token.price_change_6h_pct = poolPcp?.h6 ?? null;
+      }
+      if (token.price_change_24h_pct == null) {
+        token.price_change_24h_pct = poolPcp?.h24 ?? null;
+      }
+
+      // 12h dihitung dari OHLCV (hourly)
+      if (token.price_change_12h_pct == null && bestPool?.address) {
+        const qs = new URLSearchParams({
+          timeframe: "hour",
+          aggregate: "1",
+          limit: "13",
+        });
+
+        const ohlcvUrl =
+          `${base}/networks/${network}/pools/${bestPool.address}/ohlcv?` +
+          qs.toString();
+
+        const ohl = await fetchJson(ohlcvUrl);
+
+        if (ohl.ok && ohl.json?.data) {
+          const { now, past } = getOhlcvCloseNowAndHoursAgo(ohl.json.data, 12);
+          token.price_change_12h_pct = calcPct(now, past);
+        }
+      }
 
       return ok(res, {
         network,
@@ -156,7 +222,10 @@ export default async function handler(req, res) {
         limit,
       });
 
-      const url = `${base}/networks/${network}/pools/${address}/ohlcv?${qs.toString()}`;
+      const url =
+        `${base}/networks/${network}/pools/${address}/ohlcv?` +
+        qs.toString();
+
       const out = await fetchJson(url);
 
       if (!out.ok || !out.json?.data) {
