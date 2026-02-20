@@ -392,20 +392,35 @@ function hasValue(v) {
   return v !== null && v !== undefined && String(v).trim() !== "";
 }
 
+const colorizePct = (x) => {
+  const v = Number(x);
+  if (!Number.isFinite(v)) return String(x);
+
+  const s = v.toFixed(2).replace(/\.0+$/, "");
+  if (v > 0) return `🟢 +${s}%`;
+  if (v < 0) return `🔴 ${s}%`;
+  return `⚪ ${s}%`;
+};
+
 lines.push(`🪙 Token: ${name} (${symbol})`);
 
 if (hasValue(token.price_usd)) {
   lines.push(`💵 Price : $${formatPrice(token.price_usd)}`);
 }
 
-const ch24 =
-  token.price_change_percentage && typeof token.price_change_percentage === "object"
-    ? token.price_change_percentage.h24
-    : null;
+const ch1 = token.price_change_1h_pct ?? null;
+const ch6 = token.price_change_6h_pct ?? null;
+const ch12 = token.price_change_12h_pct ?? null;
+const ch24 = token.price_change_24h_pct ?? null;
 
-if (hasValue(ch24)) {
-  const v = Number(ch24);
-  lines.push(`📈 24h Change (%): ${Number.isFinite(v) ? v.toFixed(2).replace(/\.0+$/, "") : String(ch24)}`);
+if (hasValue(ch1) || hasValue(ch6) || hasValue(ch12) || hasValue(ch24)) {
+  const parts = [];
+  if (hasValue(ch1)) parts.push(`1h: ${colorizePct(ch1)}`);
+  if (hasValue(ch6)) parts.push(`6h: ${colorizePct(ch6)}`);
+  if (hasValue(ch12)) parts.push(`12h: ${colorizePct(ch12)}`);
+  if (hasValue(ch24)) parts.push(`24h: ${colorizePct(ch24)}`);
+
+  lines.push(`📈 Change: ${parts.join(" | ")}`);
 }
 
 if (hasValue(token.market_cap_usd)) {
@@ -433,7 +448,6 @@ if (bestPool && bestPool.id) {
     lines.push(`• Volume 24h : $${s ?? String(v24)}`);
   }
 }
-
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
 
