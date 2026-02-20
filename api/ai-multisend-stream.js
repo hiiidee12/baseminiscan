@@ -27,6 +27,37 @@ function decrypt(payload) {
 function sse(res, event, data) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
+  if (typeof res.flush === "function") res.flush();
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseDelayMs(v, fallback) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.max(Math.floor(n), 0), 10_000);
+}
+
+function asCsvList(v) {
+  return String(v || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function uniqLowerAddrs(list) {
+  const out = [];
+  const seen = new Set();
+  for (const a of list) {
+    const k = String(a || "").toLowerCase();
+    if (!k) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(a);
+  }
+  return out;
 }
 
 module.exports = async (req, res) => {
@@ -38,11 +69,10 @@ module.exports = async (req, res) => {
   try {
     const userId = String(req.query.userId || "").trim();
     const amountEth = String(req.query.amountEth || "").trim();
-    const toListRaw = String(req.query.to || "").trim(); // comma separated
-    const toList = toListRaw
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
+    const toListRaw = String(req.query.to || "").trim();
+    const delayMs = parseDelayMs(req.query.delayMs, 1500);
+
+    const toList = uniqLowerAddrs(asCsvList(toListRaw));
 
     if (!userId) {
       sse(res, "error", { ok: false, error: "userId required" });
@@ -54,6 +84,10 @@ module.exports = async (req, res) => {
     }
     if (!toList.length) {
       sse(res, "error", { ok: false, error: "to required" });
+      return res.end();
+    }
+    if (toList.length > 50) {
+      sse(res, "error", { ok: false, error: "max 50 recipients" });
       return res.end();
     }
 
@@ -78,10 +112,19 @@ module.exports = async (req, res) => {
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const signer = ethers.Wallet.fromPhrase(data.mnemonic).connect(provider);
 
-    sse(res, "start", { ok: true, from: signer.address, count: toList.length });
+    let nonce = await signer.getNonce("pending");
+
+    sse(res, "start", {
+      ok: true,
+      from: signer.address,
+      count: toList.length,
+      delayMs,
+      startNonce: nonce,
+    });
 
     for (let i = 0; i < toList.length; i++) {
       const to = toList[i];
+
       if (!ethers.isAddress(to)) {
         sse(res, "failed", { index: i, to, amountEth, error: "invalid address" });
         continue;
@@ -93,6 +136,7 @@ module.exports = async (req, res) => {
         const tx = await signer.sendTransaction({
           to,
           value: ethers.parseEther(amountEth),
+          nonce: nonce++,
         });
 
         sse(res, "sent", { index: i, to, amountEth, hash: tx.hash });
@@ -106,13 +150,33 @@ module.exports = async (req, res) => {
           status: receipt?.status ?? null,
           blockNumber: receipt?.blockNumber ?? null,
         });
+
+        if (delayMs > 0 && i < toList.length - 1) {
+          await sleep(delayMs);
+        }
       } catch (e) {
+        const msg = e?.message || String(e);
+
+        if (
+          /nonce/i.test(msg) ||
+          /replacement/i.test(msg) ||
+          /underpriced/i.test(msg)
+        ) {
+          try {
+            nonce = await signer.getNonce("pending");
+          } catch {}
+        }
+
         sse(res, "failed", {
           index: i,
           to,
           amountEth,
-          error: e?.message || String(e),
+          error: msg,
         });
+
+        if (delayMs > 0 && i < toList.length - 1) {
+          await sleep(delayMs);
+        }
       }
     }
 
