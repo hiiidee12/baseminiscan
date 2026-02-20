@@ -633,7 +633,7 @@ if (recipients) {
 
     const cgText = __buildCoinGeckoText(coingecko);
 
-    let systemText = `
+    const systemText = `
 You are a wallet AI agent.
 Always respond in the same language as the user.
 Keep answers short, clear, and non-hype.
