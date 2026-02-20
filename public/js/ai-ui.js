@@ -35,6 +35,78 @@ function __extractAddress(text) {
   return m ? m[0] : null;
 }
 
+function __parseSendLikeCommand(text) {
+  const t = String(text || "").trim();
+  const m = t.match(/^(send|multisend)\s+([0-9]*\.?[0-9]+)\s+(to|->)\s+([\s\S]+)$/i);
+  if (!m) return null;
+
+  const amountEth = m[2];
+  const rest = String(m[4] || "");
+  const addrs = rest.match(/0x[a-fA-F0-9]{40}/g) || [];
+  const uniq = [];
+  const seen = new Set();
+  for (const a of addrs) {
+    const k = a.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    uniq.push(a);
+  }
+  if (!uniq.length) return null;
+
+  return { cmd: m[1].toLowerCase(), amountEth, toList: uniq };
+}
+
+function __startMultisendStream({ userId, amountEth, toList }) {
+  const qs =
+    `userId=${encodeURIComponent(userId)}` +
+    `&amountEth=${encodeURIComponent(amountEth)}` +
+    `&to=${encodeURIComponent(toList.join(","))}`;
+
+  const es = new EventSource(`/api/ai-multisend-stream?${qs}`);
+
+  es.addEventListener("start", (e) => {
+    const d = JSON.parse(e.data);
+    __aiAdd("assistant", `🚀 Multisend started\nFrom: ${d.from}\nCount: ${d.count}`);
+  });
+
+  es.addEventListener("sending", (e) => {
+    const d = JSON.parse(e.data);
+    __aiAdd("assistant", `⏳ Sending #${d.index + 1}\n→ ${d.to}\n${d.amountEth} ETH`);
+  });
+
+  es.addEventListener("sent", (e) => {
+    const d = JSON.parse(e.data);
+    __aiAdd("assistant", `✅ Sent #${d.index + 1}\nTx: ${d.hash}`);
+  });
+
+  es.addEventListener("mined", (e) => {
+    const d = JSON.parse(e.data);
+    __aiAdd("assistant", `⛏️ Mined #${d.index + 1}\nTx: ${d.hash}\nBlock: ${d.blockNumber ?? "-"}`);
+  });
+
+  es.addEventListener("failed", (e) => {
+    const d = JSON.parse(e.data);
+    __aiAdd("assistant", `❌ Failed #${d.index + 1}\n→ ${d.to}\n${d.error}`);
+  });
+
+  es.addEventListener("done", () => {
+    __aiAdd("assistant", "🎉 Done.");
+    es.close();
+  });
+
+  es.addEventListener("error", (e) => {
+    try {
+      const d = e?.data ? JSON.parse(e.data) : null;
+      __aiAdd("assistant", `Error: ${d?.error || "stream error"}`);
+    } catch {
+      __aiAdd("assistant", "Error: stream error");
+    }
+    es.close();
+  });
+
+  return es;
+}
+
 function __pickBalanceWei(j) {
   return j?.balanceWei ?? j?.balance ?? j?.result?.balanceWei ?? j?.result?.balance ?? null;
 }
@@ -244,9 +316,7 @@ async function __aiSendNow() {
   if (btn) btn.disabled = true;
   input.disabled = true;
 
-  const thinkingIndex = __aiMessages.length;
-  __aiMessages.push({ role: "assistant", text: "Thinking..." });
-  __aiRender();
+  const sendCmd = __parseSendLikeCommand(text);
 
   const address = __extractAddress(text);
 
@@ -265,6 +335,38 @@ async function __aiSendNow() {
   if (userId) __setStoredUserId(userId);
 
   if (context && userId && String(userId).startsWith("fc:")) context.__verifiedUser = true;
+
+  if (sendCmd) {
+    if (!userId || userId === "anon") {
+      __aiAdd("assistant", "User not verified.");
+      __aiBusy = false;
+      if (btn) btn.disabled = false;
+      input.disabled = false;
+      input.focus();
+      return;
+    }
+
+    const es = __startMultisendStream({
+      userId,
+      amountEth: sendCmd.amountEth,
+      toList: sendCmd.toList,
+    });
+
+    const __done = () => {
+      __aiBusy = false;
+      if (btn) btn.disabled = false;
+      input.disabled = false;
+      input.focus();
+    };
+
+    es.addEventListener("done", __done);
+    es.addEventListener("error", __done);
+    return;
+  }
+
+  const thinkingIndex = __aiMessages.length;
+  __aiMessages.push({ role: "assistant", text: "Thinking..." });
+  __aiRender();
 
   const coingecko = await __fetchCoinGeckoContext(text);
 
@@ -329,9 +431,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   if (__aiMessages.length === 0) {
-    __aiAdd(
-      "assistant",
-      "Commands:\n• search 0x... → token info\n• scan 0x... → wallet info"
-    );
+    __aiAdd("assistant", "Commands:\n• search 0x... → token info\n• scan 0x... → wallet info");
   }
 });
