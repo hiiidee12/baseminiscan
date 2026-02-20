@@ -395,7 +395,7 @@ function hasValue(v) {
 lines.push(`🪙 Token: ${name} (${symbol})`);
 
 if (hasValue(token.price_usd)) {
-  lines.push(`💵 Price : $ ${formatPrice(token.price_usd)}`);
+  lines.push(`💵 Price : $${formatPrice(token.price_usd)}`);
 }
 
 const ch24 =
@@ -410,12 +410,12 @@ if (hasValue(ch24)) {
 
 if (hasValue(token.market_cap_usd)) {
   const s = formatNumber(token.market_cap_usd, 2);
-  lines.push(`🏦 MCap : $ ${s ?? String(token.market_cap_usd)}`);
+  lines.push(`🏦 MCap : $${s ?? String(token.market_cap_usd)}`);
 }
 
 if (hasValue(token.fdv_usd)) {
   const s = formatNumber(token.fdv_usd, 2);
-  lines.push(`📊 FDV : $ ${s ?? String(token.fdv_usd)}`);
+  lines.push(`📊 FDV : $${s ?? String(token.fdv_usd)}`);
 }
 
 if (bestPool && bestPool.id) {
@@ -424,13 +424,13 @@ if (bestPool && bestPool.id) {
 
   if (hasValue(p.reserve_in_usd)) {
     const s = formatNumber(p.reserve_in_usd, 2);
-    lines.push(`• Liquidity : $ ${s ?? String(p.reserve_in_usd)}`);
+    lines.push(`• Liquidity : $${s ?? String(p.reserve_in_usd)}`);
   }
 
   const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
   if (hasValue(v24)) {
     const s = formatNumber(v24, 2);
-    lines.push(`• Volume 24h : $ ${s ?? String(v24)}`);
+    lines.push(`• Volume 24h : $${s ?? String(v24)}`);
   }
 }
 
