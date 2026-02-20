@@ -241,6 +241,39 @@ function __parseSendCommand(text) {
   return addrs.map((to) => ({ to, amountEth }));
 }
 
+function parseRecentCommand(message, recentAddresses) {
+  if (!Array.isArray(recentAddresses) || !recentAddresses.length) return null;
+
+  const msg = message.toLowerCase();
+
+  if (/(send|transfer|kirim).*(last|terakhir)/i.test(msg)) {
+    return {
+      type: "recent",
+      toList: [recentAddresses[0]],
+    };
+  }
+
+  const m = msg.match(/recent\s*(\d+)/i);
+  if (m) {
+    const idx = Number(m[1]) - 1;
+    if (recentAddresses[idx]) {
+      return {
+        type: "recent",
+        toList: [recentAddresses[idx]],
+      };
+    }
+  }
+
+  // send to all recent
+  if (/(send|transfer|kirim).*(all recent|semua recent)/i.test(msg)) {
+    return {
+      type: "recent",
+      toList: recentAddresses.slice(0, 5),
+    };
+  }
+
+  return null;
+}
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -257,6 +290,7 @@ export default async function handler(req, res) {
     const memory = body.memory ?? null;
 
     const recentAddresses = memory?.recentRecipients?.slice(0, 5) || [];
+    const recentCmd = parseRecentCommand(message, recentAddresses);
 
     if (!message) {
       return res.status(400).json({ ok: false, error: "Missing message" });
@@ -315,8 +349,18 @@ if (/\bfid\b/i.test(message) && fid) {
       });
     }
 
-    const recipients = __parseSendCommand(message);
-    if (recipients) {
+    let recipients = _parseSendCommand(message);
+
+const recentCmd = parseRecentCommand(message, recentAddresses);
+
+if (!recipients && recentCmd) {
+  recipients = recentCmd.toList.map((to) => ({
+    to,
+    amountEth: null, // amount akan ditanya AI jika belum ada
+  }));
+}
+
+if (recipients) {
       const r = await fetch(`${baseUrl}/api/ai-multisend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
