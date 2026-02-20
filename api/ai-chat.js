@@ -366,41 +366,73 @@ export default async function handler(req, res) {
       const name = token.name ? String(token.name) : "Data not available";
       const symbol = token.symbol ? String(token.symbol) : "Data not available";
 
-      lines.push(`🪙 Token: ${name} (${symbol})`);
-      if (token.price_usd !== null && token.price_usd !== undefined && String(token.price_usd).trim() !== "") {
-        lines.push(`💵 Price : $ ${String(token.price_usd)}`);
-      }
+      function formatNumber(n, decimals = 2) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return null;
 
-      const ch24 =
-        token.price_change_percentage && typeof token.price_change_percentage === "object"
-          ? token.price_change_percentage.h24
-          : null;
+  const abs = Math.abs(x);
+  if (abs >= 1e9) return (x / 1e9).toFixed(decimals).replace(/\.0+$/, "") + "B";
+  if (abs >= 1e6) return (x / 1e6).toFixed(decimals).replace(/\.0+$/, "") + "M";
+  if (abs >= 1e3) return (x / 1e3).toFixed(decimals).replace(/\.0+$/, "") + "K";
+  return x.toLocaleString("en-US");
+}
 
-      if (ch24 !== null && ch24 !== undefined && String(ch24).trim() !== "") {
-        lines.push(`📈 24h Change (%): ${String(ch24)}`);
-      }
+function formatPrice(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return n;
 
-      if (token.market_cap_usd !== null && token.market_cap_usd !== undefined && String(token.market_cap_usd).trim() !== "") {
-        lines.push(`🏦 MCap : $ ${String(token.market_cap_usd)}`);
-      }
+  if (x >= 1) return x.toFixed(4).replace(/\.?0+$/, "");
+  if (x >= 0.1) return x.toFixed(4).replace(/\.?0+$/, "");
+  if (x >= 0.01) return x.toFixed(5).replace(/\.?0+$/, "");
+  if (x >= 0.001) return x.toFixed(6).replace(/\.?0+$/, "");
+  return x.toPrecision(4);
+}
 
-      if (token.fdv_usd !== null && token.fdv_usd !== undefined && String(token.fdv_usd).trim() !== "") {
-        lines.push(`📊 FDV : $ ${String(token.fdv_usd)}`);
-      }
+function hasValue(v) {
+  return v !== null && v !== undefined && String(v).trim() !== "";
+}
 
-      if (bestPool && bestPool.id) {
-        lines.push("");
-        lines.push("🔁 Best Pool");
+lines.push(`🪙 Token: ${name} (${symbol})`);
 
-        if (p.reserve_in_usd !== null && p.reserve_in_usd !== undefined && String(p.reserve_in_usd).trim() !== "") {
-          lines.push(`• Liquidity : $ ${String(p.reserve_in_usd)}`);
-        }
+if (hasValue(token.price_usd)) {
+  lines.push(`💵 Price : $ ${formatPrice(token.price_usd)}`);
+}
 
-        const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
-        if (v24 !== null && v24 !== undefined && String(v24).trim() !== "") {
-          lines.push(`• Volume 24h : $ ${String(v24)}`);
-        }
-      }
+const ch24 =
+  token.price_change_percentage && typeof token.price_change_percentage === "object"
+    ? token.price_change_percentage.h24
+    : null;
+
+if (hasValue(ch24)) {
+  const v = Number(ch24);
+  lines.push(`📈 24h Change (%): ${Number.isFinite(v) ? v.toFixed(2).replace(/\.0+$/, "") : String(ch24)}`);
+}
+
+if (hasValue(token.market_cap_usd)) {
+  const s = formatNumber(token.market_cap_usd, 2);
+  lines.push(`🏦 MCap : $ ${s ?? String(token.market_cap_usd)}`);
+}
+
+if (hasValue(token.fdv_usd)) {
+  const s = formatNumber(token.fdv_usd, 2);
+  lines.push(`📊 FDV : $ ${s ?? String(token.fdv_usd)}`);
+}
+
+if (bestPool && bestPool.id) {
+  lines.push("");
+  lines.push("🔁 Best Pool");
+
+  if (hasValue(p.reserve_in_usd)) {
+    const s = formatNumber(p.reserve_in_usd, 2);
+    lines.push(`• Liquidity : $ ${s ?? String(p.reserve_in_usd)}`);
+  }
+
+  const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
+  if (hasValue(v24)) {
+    const s = formatNumber(v24, 2);
+    lines.push(`• Volume 24h : $ ${s ?? String(v24)}`);
+  }
+}
 
       return res.status(200).json({ ok: true, reply: lines.join("\n") });
     }
