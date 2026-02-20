@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const { kv } = require("@vercel/kv");
 const { ethers } = require("ethers");
 
-const PREFIX = "bms:aiwallet:v1:";
+const PREFIX = "bms:wallet:v1:";
 
 function key32() {
   const master = process.env.MASTER_KEY;
@@ -36,7 +36,6 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, error: "recipients required" });
     }
 
-    // load wallet payload from KV
     const saved = await kv.get(PREFIX + String(userId));
     if (!saved) return res.status(404).json({ ok: false, error: "wallet not found" });
 
@@ -49,7 +48,6 @@ module.exports = async (req, res) => {
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const signer = ethers.Wallet.fromPhrase(data.mnemonic).connect(provider);
 
-    // basic validation
     if (recipients.length > 50) {
       return res.status(400).json({ ok: false, error: "max 50 recipients" });
     }
@@ -73,8 +71,6 @@ module.exports = async (req, res) => {
       });
 
       results.push({ to, amountEth, hash: tx.hash });
-
-      // optional: wait each tx mined (lebih aman, tapi lebih lama)
       await tx.wait();
     }
 
@@ -85,7 +81,6 @@ module.exports = async (req, res) => {
       results,
     });
   } catch (e) {
-    console.error("ai-multisend error:", e);
     return res.status(500).json({ ok: false, error: e.message || String(e) });
   }
 };
