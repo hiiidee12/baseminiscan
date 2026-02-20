@@ -420,7 +420,7 @@ if (hasValue(ch1) || hasValue(ch6) || hasValue(ch12) || hasValue(ch24)) {
   if (hasValue(ch12)) parts.push(`12h: ${colorizePct(ch12)}`);
   if (hasValue(ch24)) parts.push(`24h: ${colorizePct(ch24)}`);
 
-  lines.push(`📈 Change: ${parts.join(" | ")}`);
+  lines.push(`${parts.join(" | ")}`);
 }
 
 if (hasValue(token.market_cap_usd)) {
