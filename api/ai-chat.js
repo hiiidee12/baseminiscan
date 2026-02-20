@@ -399,7 +399,7 @@ const colorizePct = (x) => {
   const s = v.toFixed(2).replace(/\.0+$/, "");
   if (v > 0) return ` +${s}%`;
   if (v < 0) return ` ${s}%`;
-  return `⚪ ${s}%`;
+  return ` ${s}%`;
 };
 
 lines.push(`🪙 Token: ${name} (${symbol})`);
