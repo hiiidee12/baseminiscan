@@ -254,6 +254,9 @@ export default async function handler(req, res) {
     const context = body.context ?? null;
     const coingecko = body.coingecko ?? null;
     const history = Array.isArray(body.history) ? body.history : [];
+    const memory = body.memory ?? null;
+
+    const recentAddresses = memory?.recentRecipients?.slice(0, 5) || [];
 
     if (!message) {
       return res.status(400).json({ ok: false, error: "Missing message" });
@@ -614,6 +617,9 @@ CONTEXT USAGE
 - Never invent fid/username/score.
 `;
 
+    if (recentAddresses.length) {
+  systemText += `\nRECENT ADDRESSES:\n${recentAddresses.join("\n")}\n`;
+    }
     const userPrompt =
       `User message:\n${safeMessage}\n\n` +
       (cgText ? `Price/market data:\n${cgText}\n\n` : "") +
