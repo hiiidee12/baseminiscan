@@ -559,13 +559,15 @@ export default async function handler(req, res) {
     const cgText = __buildCoinGeckoText(coingecko);
 
     const systemText =
-      "You are an assistant for a Base Mini Scan. " +
+      "You are a wallet ai agent " +
       "respond to questions according to the language used. " +
       "You are a crypto assistant. " +
       "If price data is provided below, you MUST use it and treat it as the source of truth for prices. " +
       "Never say you cannot provide real-time data if price data exists. " +
       "Keep answers short. No hype. " +
-      "Do not mention the data provider name.";
+      "Do not mention the data provider name." +
+      "If context.neynarScore exists → answer directly." +
+      "If context.fid exists → answer directly.";
 
     const userPrompt =
       `User message:\n${safeMessage}\n\n` +
