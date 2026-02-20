@@ -14,6 +14,7 @@ function pickGeminiKey() {
 async function callGeminiWithRotation({ model, input, instructions, temperature, maxOutputTokens }) {
   if (!GEMINI_KEYS.length) return { ok: false, status: 0, json: null };
 
+  // FIX: Menghapus spasi di akhir URL
   const url = "https://openrouter.ai/api/v1/chat/completions";
 
   let last = { ok: false, status: 0, json: null };
@@ -274,6 +275,7 @@ function parseRecentCommand(message, recentAddresses) {
 
   return null;
 }
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -290,6 +292,8 @@ export default async function handler(req, res) {
     const memory = body.memory ?? null;
 
     const recentAddresses = memory?.recentRecipients?.slice(0, 5) || [];
+    
+    // FIX 1: Deklarasi recentCmd hanya dilakukan SATU KALI di sini
     const recentCmd = parseRecentCommand(message, recentAddresses);
 
     if (!message) {
@@ -298,38 +302,40 @@ export default async function handler(req, res) {
 
     const baseUrl = __getBaseUrl(req);
     const userId =
-  body.userId ||
-  (context && context.fid && `fc:${context.fid}`) ||
-  (context && context.address && `addr:${String(context.address).toLowerCase()}`) ||
-  "anon";
+      body.userId ||
+      (context && context.fid && `fc:${context.fid}`) ||
+      (context && context.address && `addr:${String(context.address).toLowerCase()}`) ||
+      "anon";
 
-      if (!userId || String(userId).trim() === "" || userId === "anon") {
-  return res.status(200).json({ ok: true, reply: "User not verified." });
-}
+    if (!userId || String(userId).trim() === "" || userId === "anon") {
+      // Opsional: Bisa langsung return atau biarkan AI yang menangani
+      // return res.status(200).json({ ok: true, reply: "User not verified." });
+    }
 
-const fid = context && context.fid ? String(context.fid) : null;
-const username = context && context.farcasterUsername ? String(context.farcasterUsername) : null;
-const neynarScore =
-  context && context.neynarScore !== undefined && context.neynarScore !== null
-    ? String(context.neynarScore)
-    : null;
+    const fid = context && context.fid ? String(context.fid) : null;
+    const username = context && context.farcasterUsername ? String(context.farcasterUsername) : null;
+    const neynarScore =
+      context && context.neynarScore !== undefined && context.neynarScore !== null
+        ? String(context.neynarScore)
+        : null;
 
-if (/^(who am i|siapa saya)\b/i.test(message)) {
-  const lines = [];
-  if (fid) lines.push(`FID: ${fid}`);
-  if (username) lines.push(`Username: @${username}`);
-  if (neynarScore) lines.push(`Neynar: ${neynarScore}`);
-  if (!lines.length) lines.push("Data not available.");
-  return res.status(200).json({ ok: true, reply: lines.join("\n") });
-}
+    if (/^(who am i|siapa saya)\b/i.test(message)) {
+      const lines = [];
+      if (fid) lines.push(`FID: ${fid}`);
+      if (username) lines.push(`Username: @${username}`);
+      if (neynarScore) lines.push(`Neynar: ${neynarScore}`);
+      if (!lines.length) lines.push("Data not available.");
+      return res.status(200).json({ ok: true, reply: lines.join("\n") });
+    }
 
-if (/(neynar|score)\b/i.test(message) && neynarScore) {
-  return res.status(200).json({ ok: true, reply: `Neynar: ${neynarScore}` });
-}
+    if (/(neynar|score)\b/i.test(message) && neynarScore) {
+      return res.status(200).json({ ok: true, reply: `Neynar: ${neynarScore}` });
+    }
 
-if (/\bfid\b/i.test(message) && fid) {
-  return res.status(200).json({ ok: true, reply: `FID: ${fid}` });
-}
+    if (/\bfid\b/i.test(message) && fid) {
+      return res.status(200).json({ ok: true, reply: `FID: ${fid}` });
+    }
+
     if (/^(wallet|mywallet|address)\b/i.test(message)) {
       const r = await fetch(
         `${baseUrl}/api/ai-wallet?userId=${encodeURIComponent(userId)}`
@@ -349,18 +355,27 @@ if (/\bfid\b/i.test(message) && fid) {
       });
     }
 
-    let recipients = _parseSendCommand(message);
+    // FIX 2: Menggunakan __parseSendCommand (dengan double underscore) sesuai definisi fungsi di atas
+    let recipients = __parseSendCommand(message);
 
-const recentCmd = parseRecentCommand(message, recentAddresses);
+    // FIX 3: TIDAK mendeklarasikan ulang 'const recentCmd' di sini. 
+    // Kita menggunakan variabel 'recentCmd' yang sudah dideklarasikan di awal fungsi.
+    if (!recipients && recentCmd) {
+      recipients = recentCmd.toList.map((to) => ({
+        to,
+        amountEth: null, // amount akan ditanya AI jika belum ada
+      }));
+    }
 
-if (!recipients && recentCmd) {
-  recipients = recentCmd.toList.map((to) => ({
-    to,
-    amountEth: null, // amount akan ditanya AI jika belum ada
-  }));
-}
+    if (recipients) {
+      // Validasi keamanan tambahan untuk aksi transaksi
+      if (!userId || userId === "anon") {
+         return res.status(200).json({
+            ok: true,
+            reply: "User not verified. Please connect Farcaster to send transactions.",
+         });
+      }
 
-if (recipients) {
       const r = await fetch(`${baseUrl}/api/ai-multisend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -662,8 +677,9 @@ CONTEXT USAGE
 `;
 
     if (recentAddresses.length) {
-  systemText += `\nRECENT ADDRESSES:\n${recentAddresses.join("\n")}\n`;
+      systemText += `\nRECENT ADDRESSES:\n${recentAddresses.join("\n")}\n`;
     }
+    
     const userPrompt =
       `User message:\n${safeMessage}\n\n` +
       (cgText ? `Price/market data:\n${cgText}\n\n` : "") +
@@ -693,7 +709,8 @@ CONTEXT USAGE
     const reply = __extractOpenAIText(j) || "Data not available.";
 
     return res.status(200).json({ ok: true, reply });
-  } catch {
-    return res.status(200).json({ ok: true, reply: "Data not available." });
+  } catch (e) {
+    console.error("Handler Error:", e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 }
