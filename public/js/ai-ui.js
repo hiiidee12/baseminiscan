@@ -79,6 +79,7 @@ async function __fetchExplorerContext(address) {
       })),
       farcasterUsername: fcJson?.username ?? null,
       neynarScore: fcJson?.neynarScore ?? null,
+      fid: fcJson?.fid ?? null,
     };
   } catch {
     return { address };
@@ -138,8 +139,43 @@ async function __fetchCoinGeckoContext(text) {
   }
 }
 
+function __readProfileDomContext() {
+  try {
+    const fidEl = document.getElementById("fcFid");
+    const userEl = document.getElementById("fcUser");
+    const scoreEl = document.getElementById("neynarScore");
+
+    const fidText = (fidEl?.textContent || "").trim();
+    const userText = (userEl?.textContent || "").trim();
+    const scoreText = (scoreEl?.textContent || "").trim();
+
+    const fidMatch = fidText.match(/FID:\s*([0-9]+)/i);
+    const fid = fidMatch ? fidMatch[1] : null;
+
+    const username = userText ? userText.replace(/^@/, "").trim() : null;
+
+    const scoreMatch = scoreText.match(/Neynar:\s*([0-9]*\.?[0-9]+)/i);
+    const neynarScore = scoreMatch ? scoreMatch[1] : null;
+
+    const out = {};
+    if (fid !== null && fid !== undefined && String(fid).trim() !== "") out.fid = fid;
+    if (username !== null && username !== undefined && String(username).trim() !== "")
+      out.farcasterUsername = username;
+    if (neynarScore !== null && neynarScore !== undefined && String(neynarScore).trim() !== "")
+      out.neynarScore = neynarScore;
+
+    if (out.fid) out.__verifiedUser = true;
+
+    return Object.keys(out).length ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 function __getNeynarUserContext() {
   try {
+    const domCtx = __readProfileDomContext();
+
     const w = window || {};
     const fid = w.__fid ?? w.FID ?? w.neynarFid ?? null;
     const username = w.__username ?? w.neynarUsername ?? null;
@@ -152,10 +188,43 @@ function __getNeynarUserContext() {
     if (score !== null && score !== undefined && String(score).trim() !== "")
       out.neynarScore = score;
 
-    return Object.keys(out).length ? out : null;
+    const merged = {
+      ...(out || {}),
+      ...(domCtx || {}),
+    };
+
+    if (merged.fid) merged.__verifiedUser = true;
+
+    return Object.keys(merged).length ? merged : null;
   } catch {
     return null;
   }
+}
+
+function __makeUserIdFromContext(ctx) {
+  const fid = ctx?.fid ?? null;
+  if (fid !== null && fid !== undefined && String(fid).trim() !== "") return `fc:${String(fid).trim()}`;
+
+  const addr = ctx?.address ?? null;
+  if (addr && /^0x[a-fA-F0-9]{40}$/.test(String(addr))) return `addr:${String(addr).toLowerCase()}`;
+
+  return null;
+}
+
+function __getStoredUserId() {
+  try {
+    const v = localStorage.getItem("bms_ai_userId");
+    return v && typeof v === "string" && v.trim() ? v.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function __setStoredUserId(userId) {
+  try {
+    if (!userId) return;
+    localStorage.setItem("bms_ai_userId", String(userId));
+  } catch {}
 }
 
 async function __aiSendNow() {
@@ -185,9 +254,17 @@ async function __aiSendNow() {
   const contextAddr = address ? await __fetchExplorerContext(address) : null;
 
   const context = {
-    ...(neynarCtx || {}),
     ...(contextAddr || {}),
+    ...(neynarCtx || {}),
   };
+
+  let userId = __makeUserIdFromContext(context);
+  const storedUserId = __getStoredUserId();
+
+  if (!userId && storedUserId) userId = storedUserId;
+  if (userId) __setStoredUserId(userId);
+
+  if (context && userId && String(userId).startsWith("fc:")) context.__verifiedUser = true;
 
   const coingecko = await __fetchCoinGeckoContext(text);
 
@@ -200,7 +277,7 @@ async function __aiSendNow() {
     const r = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, context, coingecko, history }),
+      body: JSON.stringify({ userId: userId || "anon", message: text, context, coingecko, history }),
     });
 
     const j = await r.json().catch(() => null);
