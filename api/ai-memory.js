@@ -1,7 +1,7 @@
 // /api/ai-memory.js
 import { kv } from "@vercel/kv";
 
-const PREFIX = "bms:aimem:v1:";
+const PREFIX = "bms:aimemory:v1:";
 
 const MAX_RECENT = 20;
 const MAX_FAVORITE = 10;
