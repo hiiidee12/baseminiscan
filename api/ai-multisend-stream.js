@@ -12,6 +12,7 @@ function key32() {
 }
 
 function decrypt(payload) {
+  if (!payload) throw new Error("Payload missing");
   const decipher = crypto.createDecipheriv(
     "aes-256-gcm",
     key32(),
@@ -25,40 +26,8 @@ function decrypt(payload) {
   return JSON.parse(out.toString("utf8"));
 }
 
-function sse(res, event, data) {
-  res.write(`event: ${event}\n`);
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
-  if (typeof res.flush === "function") res.flush();
-}
-
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function parseDelayMs(v, fallback) {
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
-  return Math.min(Math.max(Math.floor(n), 0), 10_000);
-}
-
-function asCsvList(v) {
-  return String(v || "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-function uniqLowerAddrs(list) {
-  const out = [];
-  const seen = new Set();
-  for (const a of list) {
-    const k = String(a || "").toLowerCase();
-    if (!k) continue;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(a);
-  }
-  return out;
 }
 
 function __uniqCap(list, cap) {
@@ -81,205 +50,276 @@ async function __loadMemory(userId) {
     const m = await kv.get(MEM_PREFIX + String(userId));
     if (!m) return null;
     if (typeof m === "string") {
-      try {
-        const j = JSON.parse(m);
-        return j && typeof j === "object" ? j : null;
-      } catch {
-        return null;
-      }
+      try { return JSON.parse(m); } catch { return null; }
     }
     return m && typeof m === "object" ? m : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 async function __saveMemory(userId, mem) {
   await kv.set(MEM_PREFIX + String(userId), mem);
 }
 
-module.exports = async (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
+async function executeMultisend({ userId, recipientsList, amountEthFixed, delayMs = 1000 }) {
+  const saved = await kv.get(PREFIX + userId);
+  if (!saved) throw new Error("wallet not found");
+
+  let data;
+  try {
+    data = decrypt(saved);
+  } catch (e) {
+    throw new Error("failed to decrypt wallet");
+  }
+
+  if (!data?.mnemonic) throw new Error("mnemonic missing");
+
+  const rpcUrl = process.env.RPC_URL;
+  if (!rpcUrl) throw new Error("RPC_URL missing");
+
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const signer = ethers.Wallet.fromPhrase(data.mnemonic).connect(provider);
+
+  let nonce = await signer.getNonce("pending");
+  let successCount = 0;
+  let failedCount = 0;
+  let totalSentWei = 0n;
+  const results = [];
+  const successfulTo = [];
+
+  const tasks = recipientsList.map((item, index) => {
+    let to, amount;
+    if (typeof item === 'object' && item.to) {
+      to = item.to;
+      amount = item.amountEth;
+    } else {
+      to = item;
+      amount = amountEthFixed;
+    }
+    return { index, to, amount };
+  });
+
+  for (let i = 0; i < tasks.length; i++) {
+    const { index, to, amount } = tasks[i];
+
+    if (!amount || Number(amount) <= 0) {
+      failedCount++;
+      results.push({ index, to, amount, status: "failed", error: "invalid amount" });
+      if (delayMs > 0 && i < tasks.length - 1) await sleep(delayMs);
+      continue;
+    }
+
+    if (!ethers.isAddress(to)) {
+      failedCount++;
+      results.push({ index, to, amount, status: "failed", error: "invalid address" });
+      if (delayMs > 0 && i < tasks.length - 1) await sleep(delayMs);
+      continue;
+    }
+
+    try {
+      const amtWei = ethers.parseEther(String(amount));
+      
+      const tx = await signer.sendTransaction({
+        to,
+        value: amtWei,
+        nonce: nonce++,
+      });
+
+      const receipt = await tx.wait();
+
+      successCount++;
+      totalSentWei += amtWei;
+      successfulTo.push(to);
+      
+      results.push({
+        index,
+        to,
+        amount,
+        status: "success",
+        hash: tx.hash,
+        blockNumber: receipt?.blockNumber
+      });
+
+    } catch (e) {
+      const msg = e?.message || String(e);
+      failedCount++;
+      results.push({ index, to, amount, status: "failed", error: msg });
+      
+      if (/nonce/i.test(msg) || /replacement/i.test(msg) || /underpriced/i.test(msg)) {
+        try { nonce = await signer.getNonce("pending"); } catch {}
+      }
+    }
+    
+    if (delayMs > 0 && i < tasks.length - 1) await sleep(delayMs);
+  }
 
   try {
-    const userId = String(req.query.userId || "").trim();
-    const amountEth = String(req.query.amountEth || "").trim();
-    const toListRaw = String(req.query.to || "").trim();
-    const delayMs = parseDelayMs(req.query.delayMs, 1500);
+    const mem = (await __loadMemory(userId)) || {};
+    const prevRecent = Array.isArray(mem.recentRecipients) ? mem.recentRecipients : [];
+    const nextRecent = __uniqCap([...successfulTo, ...prevRecent], 10);
 
-    const toList = uniqLowerAddrs(asCsvList(toListRaw));
+    const stats = (mem.stats && typeof mem.stats === "object") ? mem.stats : {};
+    const prevTx = Number(stats.totalTx || 0);
+    
+    let prevWei = 0n;
+    try {
+      const s = stats.totalSentWei;
+      if (typeof s === "string" && s.trim()) prevWei = BigInt(s);
+    } catch {}
 
-    if (!userId) {
-      sse(res, "error", { ok: false, error: "userId required" });
-      return res.end();
-    }
-    if (!amountEth || Number(amountEth) <= 0) {
-      sse(res, "error", { ok: false, error: "amountEth invalid" });
-      return res.end();
-    }
-    if (!toList.length) {
-      sse(res, "error", { ok: false, error: "to required" });
-      return res.end();
-    }
-    if (toList.length > 50) {
-      sse(res, "error", { ok: false, error: "max 50 recipients" });
-      return res.end();
-    }
+    const nextWei = prevWei + totalSentWei;
 
-    const saved = await kv.get(PREFIX + userId);
-    if (!saved) {
-      sse(res, "error", { ok: false, error: "wallet not found" });
-      return res.end();
-    }
+    const nextMem = {
+      ...mem,
+      recentRecipients: nextRecent,
+      stats: {
+        ...stats,
+        totalTx: prevTx + successCount,
+        totalSentWei: nextWei.toString(),
+        totalSentEth: ethers.formatEther(nextWei),
+        lastTransferAt: Date.now(),
+      },
+    };
+    await __saveMemory(userId, nextMem);
+  } catch (e) {
+    console.error("Failed to update memory:", e);
+  }
 
-    const data = decrypt(saved);
-    if (!data?.mnemonic) {
-      sse(res, "error", { ok: false, error: "mnemonic missing" });
-      return res.end();
-    }
+  return {
+    from: signer.address,
+    count: tasks.length,
+    success: successCount,
+    failed: failedCount,
+    totalSentEth: ethers.formatEther(totalSentWei),
+    results,
+  };
+}
 
-    const rpcUrl = process.env.RPC_URL;
-    if (!rpcUrl) {
-      sse(res, "error", { ok: false, error: "RPC_URL missing" });
-      return res.end();
-    }
+export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
 
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const signer = ethers.Wallet.fromPhrase(data.mnemonic).connect(provider);
+  const isStreamMode = 
+    req.headers.accept?.includes('text/event-stream') || 
+    (req.method === 'GET' && req.query.to);
 
-    let nonce = await signer.getNonce("pending");
+  if (isStreamMode) {
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
 
-    let successCount = 0;
-    let failedCount = 0;
-    let totalSentWei = 0n;
+    const sse = (event, data) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      if (typeof res.flush === "function") res.flush();
+    };
 
-    const successfulTo = [];
+    try {
+      const userId = String(req.query.userId || "").trim();
+      const amountEth = String(req.query.amountEth || "").trim();
+      const toListRaw = String(req.query.to || "").trim();
+      const delayMs = Math.min(Math.max(Number(req.query.delayMs) || 1500, 0), 10000);
 
-    sse(res, "start", {
-      ok: true,
-      from: signer.address,
-      count: toList.length,
-      delayMs,
-      startNonce: nonce,
-    });
+      const toList = String(toListRaw).split(",").map(x => x.trim()).filter(Boolean);
 
-    const amtWei = ethers.parseEther(amountEth);
+      if (!userId || !amountEth || !toList.length) {
+        sse("error", { ok: false, error: "Missing params" });
+        return res.end();
+      }
 
-    for (let i = 0; i < toList.length; i++) {
-      const to = toList[i];
+      const saved = await kv.get(PREFIX + userId);
+      if (!saved) throw new Error("wallet not found");
+      const data = decrypt(saved);
+      const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+      const signer = ethers.Wallet.fromPhrase(data.mnemonic).connect(provider);
+      let nonce = await signer.getNonce("pending");
+      
+      let successCount = 0, failedCount = 0, totalSentWei = 0n;
+      const successfulTo = [];
 
-      if (!ethers.isAddress(to)) {
-        failedCount++;
-        sse(res, "failed", { index: i, to, amountEth, error: "invalid address" });
+      sse("start", { ok: true, from: signer.address, count: toList.length, delayMs });
 
-        if (delayMs > 0 && i < toList.length - 1) {
-          await sleep(delayMs);
+      for (let i = 0; i < toList.length; i++) {
+        const to = toList[i];
+        sse("sending", { index: i, to, amountEth });
+        
+        try {
+          if (!ethers.isAddress(to)) throw new Error("invalid address");
+          
+          const tx = await signer.sendTransaction({
+            to,
+            value: ethers.parseEther(amountEth),
+            nonce: nonce++,
+          });
+
+          sse("sent", { index: i, to, amountEth, hash: tx.hash });
+          const receipt = await tx.wait();
+          sse("mined", { index: i, hash: tx.hash, status: receipt.status });
+
+          successCount++;
+          totalSentWei += ethers.parseEther(amountEth);
+          successfulTo.push(to);
+        } catch (e) {
+          sse("failed", { index: i, to, amountEth, error: e.message });
+          failedCount++;
+          if (/nonce/i.test(e.message)) {
+             try { nonce = await signer.getNonce("pending"); } catch {}
+          }
         }
-        continue;
+        if (delayMs > 0 && i < toList.length - 1) await sleep(delayMs);
       }
 
       try {
-        sse(res, "sending", { index: i, to, amountEth });
-
-        const tx = await signer.sendTransaction({
-          to,
-          value: amtWei,
-          nonce: nonce++,
+        const mem = (await __loadMemory(userId)) || {};
+        const prevRecent = Array.isArray(mem.recentRecipients) ? mem.recentRecipients : [];
+        const nextRecent = __uniqCap([...successfulTo, ...prevRecent], 10);
+        await __saveMemory(userId, {
+            ...mem,
+            recentRecipients: nextRecent,
+            stats: {
+                ...(mem.stats||{}),
+                totalTx: (mem.stats?.totalTx||0) + successCount,
+                lastTransferAt: Date.now()
+            }
         });
+      } catch {}
 
-        sse(res, "sent", { index: i, to, amountEth, hash: tx.hash });
+      sse("done", { ok: true, success: successCount, failed: failedCount, totalSentEth: ethers.formatEther(totalSentWei) });
+      return res.end();
 
-        const receipt = await tx.wait();
-        sse(res, "mined", {
-          index: i,
-          to,
-          amountEth,
-          hash: tx.hash,
-          status: receipt?.status ?? null,
-          blockNumber: receipt?.blockNumber ?? null,
-        });
-
-        successCount++;
-        totalSentWei += amtWei;
-        successfulTo.push(to);
-
-        if (delayMs > 0 && i < toList.length - 1) {
-          await sleep(delayMs);
-        }
-      } catch (e) {
-        const msg = e?.message || String(e);
-
-        if (/nonce/i.test(msg) || /replacement/i.test(msg) || /underpriced/i.test(msg)) {
-          try {
-            nonce = await signer.getNonce("pending");
-          } catch {}
-        }
-
-        failedCount++;
-        sse(res, "failed", {
-          index: i,
-          to,
-          amountEth,
-          error: msg,
-        });
-
-        if (delayMs > 0 && i < toList.length - 1) {
-          await sleep(delayMs);
-        }
-      }
+    } catch (e) {
+      sse("error", { ok: false, error: e.message });
+      return res.end();
     }
 
-    // MEMORY UPDATE (recent + stats)
-    let memoryUpdated = false;
+  } else {
+    res.setHeader("Content-Type", "application/json");
+
+    if (req.method !== "POST") {
+      return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
+
     try {
-      const mem = (await __loadMemory(userId)) || {};
-      const prevRecent = Array.isArray(mem.recentRecipients) ? mem.recentRecipients : [];
-      const nextRecent = __uniqCap([...successfulTo, ...prevRecent], 10);
+      const body = req.body || {};
+      const userId = String(body.userId || "").trim();
+      const recipients = Array.isArray(body.recipients) ? body.recipients : [];
 
-      const stats = (mem.stats && typeof mem.stats === "object") ? mem.stats : {};
-      const prevTx = Number(stats.totalTx || 0);
-      const prevWei = (() => {
-        try {
-          const s = stats.totalSentWei;
-          if (typeof s === "string" && s.trim()) return BigInt(s);
-          return 0n;
-        } catch {
-          return 0n;
-        }
-      })();
+      if (!userId) return res.status(400).json({ ok: false, error: "userId required" });
+      if (!recipients.length) return res.status(400).json({ ok: false, error: "recipients required" });
 
-      const nextWei = prevWei + totalSentWei;
+      const result = await executeMultisend({
+        userId,
+        recipientsList: recipients,
+        amountEthFixed: null,
+        delayMs: 1000
+      });
 
-      const nextMem = {
-        ...mem,
-        recentRecipients: nextRecent,
-        stats: {
-          ...stats,
-          totalTx: prevTx + successCount,
-          totalSentWei: nextWei.toString(),
-          totalSentEth: ethers.formatEther(nextWei),
-          lastTransferAt: Date.now(),
-        },
-      };
+      return res.status(200).json({
+        ok: true,
+        ...result
+      });
 
-      await __saveMemory(userId, nextMem);
-      memoryUpdated = true;
-    } catch {}
-
-    sse(res, "done", {
-      ok: true,
-      success: successCount,
-      failed: failedCount,
-      totalSentEth: ethers.formatEther(totalSentWei),
-      sentTo: successfulTo,
-      memoryUpdated,
-    });
-    return res.end();
-  } catch (e) {
-    sse(res, "error", { ok: false, error: e?.message || String(e) });
-    return res.end();
+    } catch (e) {
+      console.error("Multisend Critical Error:", e);
+      return res.status(500).json({ ok: false, error: e.message || "Critical server error" });
+    }
   }
-};
+}
