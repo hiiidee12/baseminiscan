@@ -6,7 +6,7 @@ function __aiEscape(s) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/"/g, "&q")
     .replace(/'/g, "&#39;");
 }
 
@@ -104,13 +104,14 @@ function __startMultisendStream({ userId, amountEth, toList }) {
   });
 
   es.addEventListener("done", (e) => {
-  const d = e?.data ? JSON.parse(e.data) : {};
-  __aiAdd(
-    "assistant",
-    `🎉 All Done\n• Success: ${d.success ?? 0}\n• Failed: ${d.failed ?? 0}\n• Total ETH: ${d.totalSentEth ?? "0"}`
-  );
-  es.close();
-});
+    const d = e?.data ? JSON.parse(e.data) : {};
+    __aiAdd(
+      "assistant",
+      `🎉 All Done\n• Success: ${d.success ?? 0}\n• Failed: ${d.failed ?? 0}\n• Total ETH: ${d.totalSentEth ?? "0"}`
+    );
+    es.close();
+  });
+
   es.addEventListener("error", (e) => {
     try {
       const d = e?.data ? JSON.parse(e.data) : null;
@@ -313,6 +314,34 @@ function __setStoredUserId(userId) {
   } catch {}
 }
 
+async function __memGet(userId) {
+  if (!userId) return null;
+  try {
+    const r = await fetch(`/api/ai-memory?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) return null;
+    return j.memory || null;
+  } catch {
+    return null;
+  }
+}
+
+async function __memPost(userId, body) {
+  if (!userId) return null;
+  try {
+    const r = await fetch("/api/ai-memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, ...(body || {}) }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) return null;
+    return j.memory || null;
+  } catch {
+    return null;
+  }
+}
+
 async function __aiSendNow() {
   if (__aiBusy) return;
 
@@ -359,6 +388,18 @@ async function __aiSendNow() {
       return;
     }
 
+    if (userId) {
+      __memPost(userId, {
+        action: "save_recent",
+        addresses: sendCmd.toList,
+        memory: {
+          lastAmountEth: sendCmd.amountEth,
+          defaultAmountEth: sendCmd.amountEth,
+          lastUsedAt: Date.now(),
+        },
+      });
+    }
+
     const es = __startMultisendStream({
       userId,
       amountEth: sendCmd.amountEth,
@@ -381,6 +422,8 @@ async function __aiSendNow() {
   __aiMessages.push({ role: "assistant", text: "Thinking..." });
   __aiRender();
 
+  const memory = userId ? await __memGet(userId) : null;
+
   const coingecko = await __fetchCoinGeckoContext(text);
 
   const history = __aiMessages
@@ -392,7 +435,7 @@ async function __aiSendNow() {
     const r = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: userId || "anon", message: text, context, coingecko, history }),
+      body: JSON.stringify({ userId: userId || "anon", message: text, context, coingecko, history, memory }),
     });
 
     const j = await r.json().catch(() => null);
