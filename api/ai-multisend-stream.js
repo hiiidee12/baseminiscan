@@ -3,6 +3,7 @@ const { kv } = require("@vercel/kv");
 const { ethers } = require("ethers");
 
 const PREFIX = "bms:aiwallet:v1:";
+const MEM_PREFIX = "bms:aimemory:v1:";
 
 function key32() {
   const master = process.env.MASTER_KEY;
@@ -58,6 +59,43 @@ function uniqLowerAddrs(list) {
     out.push(a);
   }
   return out;
+}
+
+function __uniqCap(list, cap) {
+  const out = [];
+  const seen = new Set();
+  for (const x of list) {
+    const v = String(x || "").trim();
+    if (!v) continue;
+    const k = v.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(v);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+async function __loadMemory(userId) {
+  try {
+    const m = await kv.get(MEM_PREFIX + String(userId));
+    if (!m) return null;
+    if (typeof m === "string") {
+      try {
+        const j = JSON.parse(m);
+        return j && typeof j === "object" ? j : null;
+      } catch {
+        return null;
+      }
+    }
+    return m && typeof m === "object" ? m : null;
+  } catch {
+    return null;
+  }
+}
+
+async function __saveMemory(userId, mem) {
+  await kv.set(MEM_PREFIX + String(userId), mem);
 }
 
 module.exports = async (req, res) => {
@@ -118,6 +156,8 @@ module.exports = async (req, res) => {
     let failedCount = 0;
     let totalSentWei = 0n;
 
+    const successfulTo = [];
+
     sse(res, "start", {
       ok: true,
       from: signer.address,
@@ -125,6 +165,8 @@ module.exports = async (req, res) => {
       delayMs,
       startNonce: nonce,
     });
+
+    const amtWei = ethers.parseEther(amountEth);
 
     for (let i = 0; i < toList.length; i++) {
       const to = toList[i];
@@ -144,7 +186,7 @@ module.exports = async (req, res) => {
 
         const tx = await signer.sendTransaction({
           to,
-          value: ethers.parseEther(amountEth),
+          value: amtWei,
           nonce: nonce++,
         });
 
@@ -161,7 +203,8 @@ module.exports = async (req, res) => {
         });
 
         successCount++;
-        totalSentWei += ethers.parseEther(amountEth);
+        totalSentWei += amtWei;
+        successfulTo.push(to);
 
         if (delayMs > 0 && i < toList.length - 1) {
           await sleep(delayMs);
@@ -189,11 +232,50 @@ module.exports = async (req, res) => {
       }
     }
 
+    // MEMORY UPDATE (recent + stats)
+    let memoryUpdated = false;
+    try {
+      const mem = (await __loadMemory(userId)) || {};
+      const prevRecent = Array.isArray(mem.recentRecipients) ? mem.recentRecipients : [];
+      const nextRecent = __uniqCap([...successfulTo, ...prevRecent], 10);
+
+      const stats = (mem.stats && typeof mem.stats === "object") ? mem.stats : {};
+      const prevTx = Number(stats.totalTx || 0);
+      const prevWei = (() => {
+        try {
+          const s = stats.totalSentWei;
+          if (typeof s === "string" && s.trim()) return BigInt(s);
+          return 0n;
+        } catch {
+          return 0n;
+        }
+      })();
+
+      const nextWei = prevWei + totalSentWei;
+
+      const nextMem = {
+        ...mem,
+        recentRecipients: nextRecent,
+        stats: {
+          ...stats,
+          totalTx: prevTx + successCount,
+          totalSentWei: nextWei.toString(),
+          totalSentEth: ethers.formatEther(nextWei),
+          lastTransferAt: Date.now(),
+        },
+      };
+
+      await __saveMemory(userId, nextMem);
+      memoryUpdated = true;
+    } catch {}
+
     sse(res, "done", {
       ok: true,
       success: successCount,
       failed: failedCount,
       totalSentEth: ethers.formatEther(totalSentWei),
+      sentTo: successfulTo,
+      memoryUpdated,
     });
     return res.end();
   } catch (e) {
