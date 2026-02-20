@@ -224,13 +224,14 @@ function __getBaseUrl(req) {
 
 function __parseSendCommand(text) {
   const t = String(text || "").trim();
-  const m = t.match(/^(send|multisend)\s+([0-9]*\.?[0-9]+)\s+(to|->)\s+(.+)$/i);
+  const m = t.match(/^(send|multisend)\s+([0-9]*\.?[0-9]+)\s+(to|->)\s+([\s\S]+)$/i);
   if (!m) return null;
 
   const amountEth = m[2];
-  const raw = m[4]
-    .replace(/,/g, " ")
-    .split(" ")
+
+  const raw = String(m[4])
+    .replace(/[,;]+/g, " ")
+    .split(/\s+/)
     .map((x) => x.trim())
     .filter(Boolean);
 
