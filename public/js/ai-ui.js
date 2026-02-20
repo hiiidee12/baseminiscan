@@ -88,17 +88,7 @@ function __startMultisendStream({ userId, amountEth, toList }) {
   es.addEventListener("sent", (e) => {
     const d = JSON.parse(e.data);
     if (__lastSendIndex != null && __aiMessages[__lastSendIndex]) {
-      __aiMessages[__lastSendIndex].text = `📤 Sent #${d.index + 1}\nTx: ${d.hash}`;
-      __aiRender();
-    }
-  });
-
-  es.addEventListener("mined", (e) => {
-    const d = JSON.parse(e.data);
-    if (__lastSendIndex != null && __aiMessages[__lastSendIndex]) {
-      __aiMessages[__lastSendIndex].text = `✅ Mined #${d.index + 1}\nTx: ${d.hash}\nBlock: ${
-        d.blockNumber ?? "-"
-      }`;
+      __aiMessages[__lastSendIndex].text = `💸 Sent #${d.index + 1}\nTx: ${d.hash}`;
       __aiRender();
     }
   });
@@ -114,7 +104,7 @@ function __startMultisendStream({ userId, amountEth, toList }) {
   });
 
   es.addEventListener("done", () => {
-    __aiAdd("assistant", "🎉 Done.");
+    __aiAdd("assistant", "✅ All Done.");
     es.close();
   });
 
