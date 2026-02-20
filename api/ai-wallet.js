@@ -1,47 +1,43 @@
 import { Wallet } from "ethers";
-import {
-  getEncryptedWalletPayload,
-  setEncryptedWalletPayload,
-  encryptObj,
-  decryptObj,
-} from "../../lib/walletStore";
+import { encrypt, decrypt, loadWallet, saveWallet } from "../lib/walletStore.js";
 
-export default async function handler(req, res) {
+export default async (req, res) => {
   try {
-    const userId = req.method === "POST"
-      ? req.body?.userId
-      : req.query?.userId;
-
+    const userId = req.query.userId || req.body?.userId;
     if (!userId) {
       return res.status(400).json({ ok: false, error: "userId required" });
     }
 
-    const saved = await getEncryptedWalletPayload(userId);
+    const saved = await loadWallet(userId);
 
     if (saved) {
-      const data = decryptObj(saved);
+      const data = decrypt(saved);
       const wallet = Wallet.fromPhrase(data.mnemonic);
-      return res.json({
+      return res.status(200).json({
         ok: true,
         address: wallet.address,
         created: false,
       });
     }
 
-    const w = Wallet.createRandom();
-    const payload = encryptObj({
-      mnemonic: w.mnemonic.phrase,
+    const wallet = Wallet.createRandom();
+    const payload = encrypt({
+      mnemonic: wallet.mnemonic.phrase,
       createdAt: Date.now(),
     });
 
-    await setEncryptedWalletPayload(userId, payload);
+    await saveWallet(userId, payload);
 
-    return res.json({
+    return res.status(200).json({
       ok: true,
-      address: w.address,
+      address: wallet.address,
       created: true,
     });
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e) });
+  } catch (err) {
+    console.error("AI WALLET ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || "internal error",
+    });
   }
-}
+};
