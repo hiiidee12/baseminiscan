@@ -3,9 +3,11 @@ let __aiBusy = false;
 
 function __aiEscape(s) {
   return String(s || "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function __aiRender() {
@@ -13,13 +15,14 @@ function __aiRender() {
   if (!el) return;
 
   el.innerHTML = __aiMessages
-    .map(
-      (m) => `
+    .map((m) => {
+      const html = __aiEscape(m.text).replace(/\n/g, "<br/>");
+      return `
     <div class="aiMsg ${m.role}">
-      <div class="aiBubble">${__aiEscape(m.text)}</div>
+      <div class="aiBubble">${html}</div>
     </div>
-  `
-    )
+  `;
+    })
     .join("");
 
   el.scrollTop = el.scrollHeight;
@@ -45,6 +48,7 @@ function __parseSendLikeCommand(text) {
   const addrs = rest.match(/0x[a-fA-F0-9]{40}/g) || [];
   const uniq = [];
   const seen = new Set();
+
   for (const a of addrs) {
     const k = a.toLowerCase();
     if (seen.has(k)) continue;
@@ -53,7 +57,11 @@ function __parseSendLikeCommand(text) {
   }
   if (!uniq.length) return null;
 
-  return { cmd: m[1].toLowerCase(), amountEth, toList: uniq };
+  if (m[1].toLowerCase() === "send") {
+    return { cmd: "send", amountEth, toList: [uniq[0]] };
+  }
+
+  return { cmd: "multisend", amountEth, toList: uniq };
 }
 
 function __startMultisendStream({ userId, amountEth, toList }) {
@@ -64,6 +72,8 @@ function __startMultisendStream({ userId, amountEth, toList }) {
 
   const es = new EventSource(`/api/ai-multisend-stream?${qs}`);
 
+  let __lastSendIndex = null;
+
   es.addEventListener("start", (e) => {
     const d = JSON.parse(e.data);
     __aiAdd("assistant", `🚀 Multisend started\nFrom: ${d.from}\nCount: ${d.count}`);
@@ -71,22 +81,36 @@ function __startMultisendStream({ userId, amountEth, toList }) {
 
   es.addEventListener("sending", (e) => {
     const d = JSON.parse(e.data);
+    __lastSendIndex = __aiMessages.length;
     __aiAdd("assistant", `⏳ Sending #${d.index + 1}\n→ ${d.to}\n${d.amountEth} ETH`);
   });
 
   es.addEventListener("sent", (e) => {
     const d = JSON.parse(e.data);
-    __aiAdd("assistant", `✅ Sent #${d.index + 1}\nTx: ${d.hash}`);
+    if (__lastSendIndex != null && __aiMessages[__lastSendIndex]) {
+      __aiMessages[__lastSendIndex].text = `📤 Sent #${d.index + 1}\nTx: ${d.hash}`;
+      __aiRender();
+    }
   });
 
   es.addEventListener("mined", (e) => {
     const d = JSON.parse(e.data);
-    __aiAdd("assistant", `⛏️ Mined #${d.index + 1}\nTx: ${d.hash}\nBlock: ${d.blockNumber ?? "-"}`);
+    if (__lastSendIndex != null && __aiMessages[__lastSendIndex]) {
+      __aiMessages[__lastSendIndex].text = `✅ Mined #${d.index + 1}\nTx: ${d.hash}\nBlock: ${
+        d.blockNumber ?? "-"
+      }`;
+      __aiRender();
+    }
   });
 
   es.addEventListener("failed", (e) => {
     const d = JSON.parse(e.data);
-    __aiAdd("assistant", `❌ Failed #${d.index + 1}\n→ ${d.to}\n${d.error}`);
+    if (__lastSendIndex != null && __aiMessages[__lastSendIndex]) {
+      __aiMessages[__lastSendIndex].text = `❌ Failed #${d.index + 1}\n→ ${d.to}\n${d.error}`;
+      __aiRender();
+    } else {
+      __aiAdd("assistant", `❌ Failed #${d.index + 1}\n→ ${d.to}\n${d.error}`);
+    }
   });
 
   es.addEventListener("done", () => {
@@ -202,9 +226,7 @@ async function __fetchCoinGeckoContext(text) {
     }
 
     const [price, global] = await Promise.all(jobs);
-
     if (!price && !global) return null;
-
     return { price, global };
   } catch {
     return null;
@@ -257,8 +279,7 @@ function __getNeynarUserContext() {
     if (fid !== null && fid !== undefined && String(fid).trim() !== "") out.fid = fid;
     if (username !== null && username !== undefined && String(username).trim() !== "")
       out.farcasterUsername = username;
-    if (score !== null && score !== undefined && String(score).trim() !== "")
-      out.neynarScore = score;
+    if (score !== null && score !== undefined && String(score).trim() !== "") out.neynarScore = score;
 
     const merged = {
       ...(out || {}),
@@ -317,7 +338,6 @@ async function __aiSendNow() {
   input.disabled = true;
 
   const sendCmd = __parseSendLikeCommand(text);
-
   const address = __extractAddress(text);
 
   const neynarCtx = __getNeynarUserContext();
