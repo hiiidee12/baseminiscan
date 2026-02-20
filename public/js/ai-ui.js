@@ -138,6 +138,26 @@ async function __fetchCoinGeckoContext(text) {
   }
 }
 
+function __getNeynarUserContext() {
+  try {
+    const w = window || {};
+    const fid = w.__fid ?? w.FID ?? w.neynarFid ?? null;
+    const username = w.__username ?? w.neynarUsername ?? null;
+    const score = w.__neynarScore ?? w.neynarScore ?? null;
+
+    const out = {};
+    if (fid !== null && fid !== undefined && String(fid).trim() !== "") out.fid = fid;
+    if (username !== null && username !== undefined && String(username).trim() !== "")
+      out.farcasterUsername = username;
+    if (score !== null && score !== undefined && String(score).trim() !== "")
+      out.neynarScore = score;
+
+    return Object.keys(out).length ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 async function __aiSendNow() {
   if (__aiBusy) return;
 
@@ -160,7 +180,15 @@ async function __aiSendNow() {
   __aiRender();
 
   const address = __extractAddress(text);
-  const context = address ? await __fetchExplorerContext(address) : null;
+
+  const neynarCtx = __getNeynarUserContext();
+  const contextAddr = address ? await __fetchExplorerContext(address) : null;
+
+  const context = {
+    ...(neynarCtx || {}),
+    ...(contextAddr || {}),
+  };
+
   const coingecko = await __fetchCoinGeckoContext(text);
 
   const history = __aiMessages
@@ -224,9 +252,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   if (__aiMessages.length === 0) {
-  __aiAdd(
-    "assistant",
-    "Commands:\n• search 0x... → token info\n• scan 0x... → wallet info"
-  );
+    __aiAdd(
+      "assistant",
+      "Commands:\n• search 0x... → token info\n• scan 0x... → wallet info"
+    );
   }
 });
