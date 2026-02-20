@@ -114,6 +114,10 @@ module.exports = async (req, res) => {
 
     let nonce = await signer.getNonce("pending");
 
+    let successCount = 0;
+    let failedCount = 0;
+    let totalSentWei = 0n;
+
     sse(res, "start", {
       ok: true,
       from: signer.address,
@@ -126,7 +130,12 @@ module.exports = async (req, res) => {
       const to = toList[i];
 
       if (!ethers.isAddress(to)) {
+        failedCount++;
         sse(res, "failed", { index: i, to, amountEth, error: "invalid address" });
+
+        if (delayMs > 0 && i < toList.length - 1) {
+          await sleep(delayMs);
+        }
         continue;
       }
 
@@ -151,22 +160,22 @@ module.exports = async (req, res) => {
           blockNumber: receipt?.blockNumber ?? null,
         });
 
+        successCount++;
+        totalSentWei += ethers.parseEther(amountEth);
+
         if (delayMs > 0 && i < toList.length - 1) {
           await sleep(delayMs);
         }
       } catch (e) {
         const msg = e?.message || String(e);
 
-        if (
-          /nonce/i.test(msg) ||
-          /replacement/i.test(msg) ||
-          /underpriced/i.test(msg)
-        ) {
+        if (/nonce/i.test(msg) || /replacement/i.test(msg) || /underpriced/i.test(msg)) {
           try {
             nonce = await signer.getNonce("pending");
           } catch {}
         }
 
+        failedCount++;
         sse(res, "failed", {
           index: i,
           to,
@@ -180,7 +189,12 @@ module.exports = async (req, res) => {
       }
     }
 
-    sse(res, "done", { ok: true });
+    sse(res, "done", {
+      ok: true,
+      success: successCount,
+      failed: failedCount,
+      totalSentEth: ethers.formatEther(totalSentWei),
+    });
     return res.end();
   } catch (e) {
     sse(res, "error", { ok: false, error: e?.message || String(e) });
