@@ -14,7 +14,6 @@ function pickGeminiKey() {
 async function callGeminiWithRotation({ model, input, instructions, temperature, maxOutputTokens }) {
   if (!GEMINI_KEYS.length) return { ok: false, status: 0, json: null };
 
-  // FIX: Menghapus spasi di akhir URL
   const url = "https://openrouter.ai/api/v1/chat/completions";
 
   let last = { ok: false, status: 0, json: null };
@@ -247,11 +246,15 @@ function parseRecentCommand(message, recentAddresses) {
 
   const msg = message.toLowerCase();
 
-  if (/(send|transfer|kirim).*(last|terakhir)/i.test(msg)) {
+  if (/(send|sent|transfer|kirim).*(last|terakhir)/i.test(msg)) {
     return {
       type: "recent",
       toList: [recentAddresses[0]],
     };
+  }
+
+  if (/\b(to|->)\s+recent\b/i.test(msg)) {
+     return { type: "recent", toList: [recentAddresses[0]] };
   }
 
   const m = msg.match(/recent\s*(\d+)/i);
@@ -265,8 +268,7 @@ function parseRecentCommand(message, recentAddresses) {
     }
   }
 
-  // send to all recent
-  if (/(send|transfer|kirim).*(all recent|semua recent)/i.test(msg)) {
+  if (/(send|sent|transfer|kirim).*(all recent|semua recent)/i.test(msg)) {
     return {
       type: "recent",
       toList: recentAddresses.slice(0, 5),
@@ -292,8 +294,6 @@ export default async function handler(req, res) {
     const memory = body.memory ?? null;
 
     const recentAddresses = memory?.recentRecipients?.slice(0, 5) || [];
-    
-    // FIX 1: Deklarasi recentCmd hanya dilakukan SATU KALI di sini
     const recentCmd = parseRecentCommand(message, recentAddresses);
 
     if (!message) {
@@ -308,8 +308,7 @@ export default async function handler(req, res) {
       "anon";
 
     if (!userId || String(userId).trim() === "" || userId === "anon") {
-      // Opsional: Bisa langsung return atau biarkan AI yang menangani
-      // return res.status(200).json({ ok: true, reply: "User not verified." });
+      // Biarkan AI menangani atau return early jika diperlukan
     }
 
     const fid = context && context.fid ? String(context.fid) : null;
@@ -355,20 +354,30 @@ export default async function handler(req, res) {
       });
     }
 
-    // FIX 2: Menggunakan __parseSendCommand (dengan double underscore) sesuai definisi fungsi di atas
     let recipients = __parseSendCommand(message);
 
-    // FIX 3: TIDAK mendeklarasikan ulang 'const recentCmd' di sini. 
-    // Kita menggunakan variabel 'recentCmd' yang sudah dideklarasikan di awal fungsi.
     if (!recipients && recentCmd) {
+      const amountMatch = message.match(/(?:send|sent|transfer|kirim|multisend)\s+([0-9]*\.?[0-9]+)\s*(?:to|->|ke)?/i);
+      
+      let targetAmount = null;
+      if (amountMatch && amountMatch[1]) {
+        targetAmount = amountMatch[1];
+      }
+
+      if (!targetAmount) {
+         return res.status(200).json({
+           ok: true,
+           reply: "Format salah. Contoh: 'send 0.001 to recent 1' atau 'send 0.001 to all recent'."
+         });
+      }
+
       recipients = recentCmd.toList.map((to) => ({
         to,
-        amountEth: null, // amount akan ditanya AI jika belum ada
+        amountEth: targetAmount,
       }));
     }
 
     if (recipients) {
-      // Validasi keamanan tambahan untuk aksi transaksi
       if (!userId || userId === "anon") {
          return res.status(200).json({
             ok: true,
@@ -376,13 +385,27 @@ export default async function handler(req, res) {
          });
       }
 
-      const r = await fetch(`${baseUrl}/api/ai-multisend`, {
+      console.log("Sending multisend:", { userId, recipients });
+
+      const r = await fetch(`${baseUrl}/api/ai-multisend-stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, recipients }),
       });
 
-      const j = await r.json().catch(() => null);
+      if (!r.ok) {
+        const errText = await r.text();
+        console.error("Multisend API Error:", r.status, errText);
+        return res.status(200).json({
+          ok: true,
+          reply: `Send failed: Server error ${r.status}. ${errText.slice(0, 100)}`
+        });
+      }
+
+      const j = await r.json().catch((e) => {
+        console.error("JSON Parse Error:", e);
+        return null;
+      });
 
       if (!j || !j.ok) {
         return res.status(200).json({
@@ -397,8 +420,12 @@ export default async function handler(req, res) {
       lines.push(`Count: ${j.count}`);
 
       for (const it of j.results || []) {
-        lines.push(`→ ${it.to} (${it.amountEth} ETH)`);
-        lines.push(`Tx: ${it.hash}`);
+        if (it.status === 'success') {
+           lines.push(`→ ${it.to} (${it.amount} ETH)`);
+           lines.push(`Tx: ${it.hash}`);
+        } else {
+           lines.push(`❌ Failed → ${it.to}: ${it.error}`);
+        }
       }
 
       return res.status(200).json({
@@ -422,25 +449,13 @@ export default async function handler(req, res) {
       const address = scanAddress;
 
       const farcasterUsername = (context && context.farcasterUsername) || null;
-
-      const neynarScoreRaw =
-        context && context.neynarScore !== undefined ? context.neynarScore : null;
-
-      const balanceEthRaw =
-        context && context.balanceEth !== undefined ? context.balanceEth : null;
-
-      const balanceWeiRaw =
-        context && context.balanceWei !== undefined ? context.balanceWei : null;
-
-      const txCountRaw =
-        context && context.txCount !== undefined ? context.txCount : null;
+      const neynarScoreRaw = context && context.neynarScore !== undefined ? context.neynarScore : null;
+      const balanceEthRaw = context && context.balanceEth !== undefined ? context.balanceEth : null;
+      const balanceWeiRaw = context && context.balanceWei !== undefined ? context.balanceWei : null;
+      const txCountRaw = context && context.txCount !== undefined ? context.txCount : null;
 
       const safeFarcaster = farcasterUsername ? String(farcasterUsername) : "Data not available";
-
-      const safeNeynar =
-        neynarScoreRaw === null || neynarScoreRaw === undefined || neynarScoreRaw === ""
-          ? "Data not available"
-          : String(neynarScoreRaw);
+      const safeNeynar = neynarScoreRaw === null || neynarScoreRaw === undefined || neynarScoreRaw === "" ? "Data not available" : String(neynarScoreRaw);
 
       let safeBalance = "Data not available";
       if (balanceEthRaw !== null && balanceEthRaw !== undefined && balanceEthRaw !== "") {
@@ -456,10 +471,7 @@ export default async function handler(req, res) {
         } catch {}
       }
 
-      const safeTx =
-        txCountRaw === null || txCountRaw === undefined || txCountRaw === ""
-          ? "Data not available"
-          : String(txCountRaw);
+      const safeTx = txCountRaw === null || txCountRaw === undefined || txCountRaw === "" ? "Data not available" : String(txCountRaw);
 
       const lines = [
         `💳 Farcaster: ${safeFarcaster}`,
@@ -478,12 +490,7 @@ export default async function handler(req, res) {
       const txCountNum = toNum(txCountRaw);
 
       let balanceEthParsed = balanceEthNum;
-      if (
-        (balanceEthParsed === null || balanceEthParsed === undefined) &&
-        balanceWeiRaw !== null &&
-        balanceWeiRaw !== undefined &&
-        balanceWeiRaw !== ""
-      ) {
+      if ((balanceEthParsed === null || balanceEthParsed === undefined) && balanceWeiRaw !== null && balanceWeiRaw !== undefined && balanceWeiRaw !== "") {
         try {
           const w = BigInt(String(balanceWeiRaw));
           const base = 10n ** 18n;
@@ -537,14 +544,12 @@ export default async function handler(req, res) {
       const p = bestPool && bestPool.attributes ? bestPool.attributes : {};
 
       const lines = [];
-
       const name = token.name ? String(token.name) : "Data not available";
       const symbol = token.symbol ? String(token.symbol) : "Data not available";
 
       function formatNumber(n, decimals = 2) {
         const x = Number(n);
         if (!Number.isFinite(x)) return null;
-
         const abs = Math.abs(x);
         if (abs >= 1e9) return (x / 1e9).toFixed(decimals).replace(/\.0+$/, "") + "B";
         if (abs >= 1e6) return (x / 1e6).toFixed(decimals).replace(/\.0+$/, "") + "M";
@@ -555,7 +560,6 @@ export default async function handler(req, res) {
       function formatPrice(n) {
         const x = Number(n);
         if (!Number.isFinite(x)) return n;
-
         if (x >= 1) return x.toFixed(4).replace(/\.?0+$/, "");
         if (x >= 0.1) return x.toFixed(4).replace(/\.?0+$/, "");
         if (x >= 0.01) return x.toFixed(5).replace(/\.?0+$/, "");
@@ -570,7 +574,6 @@ export default async function handler(req, res) {
       const colorizePct = (x) => {
         const v = Number(x);
         if (!Number.isFinite(v)) return String(x);
-
         const s = v.toFixed(2).replace(/\.0+$/, "");
         if (v > 0) return ` +${s}%`;
         if (v < 0) return ` ${s}%`;
@@ -594,7 +597,6 @@ export default async function handler(req, res) {
         if (hasValue(ch6)) parts.push(`6h:${colorizePct(ch6)}`);
         if (hasValue(ch12)) parts.push(`12h:${colorizePct(ch12)}`);
         if (hasValue(ch24)) parts.push(`24h:${colorizePct(ch24)}`);
-
         lines.push(`${parts.join(" | ")}`);
       }
 
@@ -611,12 +613,10 @@ export default async function handler(req, res) {
       if (bestPool && bestPool.id) {
         lines.push("");
         lines.push("🔁 Best Pool");
-
         if (hasValue(p.reserve_in_usd)) {
           const s = formatNumber(p.reserve_in_usd, 2);
           lines.push(`• Liquidity : $${s ?? String(p.reserve_in_usd)}`);
         }
-
         const v24 = p.volume_usd && typeof p.volume_usd === "object" ? p.volume_usd.h24 : null;
         if (hasValue(v24)) {
           const s = formatNumber(v24, 2);
@@ -640,7 +640,6 @@ export default async function handler(req, res) {
     }
 
     const safeMessage = message.slice(0, 3000);
-
     const trimmedHistory = history.slice(-8).map((m) => ({
       role: m?.role === "assistant" ? "assistant" : "user",
       content: String(m?.text || "").slice(0, 2000),
@@ -705,7 +704,6 @@ CONTEXT USAGE
     }
 
     const j = out.json;
-
     const reply = __extractOpenAIText(j) || "Data not available.";
 
     return res.status(200).json({ ok: true, reply });
