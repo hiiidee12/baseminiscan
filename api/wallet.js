@@ -80,7 +80,9 @@ export default async function handler(req, res) {
           return res.status(200).json({ ok: true, hasWallet: false });
         }
 
-        const { address } = decrypt(saved);
+        const data = decrypt(saved);
+        const address = data?.address || null;
+
         return res.status(200).json({ ok: true, hasWallet: true, address });
       } catch (err) {
         logError("Load wallet failed", err);
@@ -136,12 +138,18 @@ export default async function handler(req, res) {
           return res.status(404).json({ ok: false, error: "Wallet not found" });
         }
 
-        const { privateKey } = decrypt(saved);
-        if (!privateKey) {
-          return res.status(404).json({ ok: false, error: "No private key stored" });
+        const data = decrypt(saved);
+
+        const mnemonic =
+          data && typeof data.mnemonic === "string" && data.mnemonic.trim()
+            ? data.mnemonic.trim()
+            : null;
+
+        if (!mnemonic) {
+          return res.status(404).json({ ok: false, error: "No mnemonic stored" });
         }
 
-        return res.status(200).json({ ok: true, privateKey });
+        return res.status(200).json({ ok: true, mnemonic });
       } catch (err) {
         logError("Export wallet failed", err);
         return res.status(500).json({ ok: false, error: "Failed to export" });
