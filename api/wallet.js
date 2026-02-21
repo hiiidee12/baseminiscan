@@ -1,5 +1,5 @@
 export const config = { runtime: 'nodejs', };
-import { encrypt, decrypt, loadWallet, saveWallet } from "../../lib/walletStore";
+import { encrypt, decrypt, loadWallet, saveWallet } from "../lib/walletStore";
 import {
   requireVerifiedUser,
   isValidPrivateKey,
