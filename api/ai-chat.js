@@ -293,7 +293,7 @@ export default async function handler(req, res) {
     if (cmd === "export") {
       const baseUrl = __getBaseUrl(req);
       const r1 = await fetch(
-        `${baseUrl}/api/wallet?action=export_nonce&context=${encodeURIComponent(JSON.stringify(context))}`
+        `${baseUrl}/api/ai-wallet?action=export_nonce&context=${encodeURIComponent(JSON.stringify(context))}`
       );
       const j1 = await r1.json();
 
@@ -301,7 +301,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: false, error: "Export failed: " + (j1.error || "Unknown error") });
       }
 
-      const r2 = await fetch(`${baseUrl}/api/wallet?action=export`, {
+      const r2 = await fetch(`${baseUrl}/api/ai-wallet?action=export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -638,7 +638,7 @@ export default async function handler(req, res) {
 
   // 1. nonce
   const r1 = await fetch(
-    `${baseUrl}/api/wallet?action=export_nonce&context=${encodeURIComponent(
+    `${baseUrl}/api/ai-wallet?action=export_nonce&context=${encodeURIComponent(
       JSON.stringify(context)
     )}`
   );
@@ -652,7 +652,7 @@ export default async function handler(req, res) {
   }
 
   // 2. export private key
-  const r2 = await fetch(`${baseUrl}/api/wallet?action=export`, {
+  const r2 = await fetch(`${baseUrl}/api/ai-wallet?action=export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
