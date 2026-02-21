@@ -287,8 +287,43 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const message = String(body.message || "").trim();
+    const cmd = body.cmd;
     const context = body.context ?? null;
+
+    if (cmd === "export") {
+      const baseUrl = __getBaseUrl(req);
+      const r1 = await fetch(
+        `${baseUrl}/api/wallet?action=export_nonce&context=${encodeURIComponent(JSON.stringify(context))}`
+      );
+      const j1 = await r1.json();
+
+      if (!j1.ok) {
+        return res.status(200).json({ ok: false, error: "Export failed: " + (j1.error || "Unknown error") });
+      }
+
+      const r2 = await fetch(`${baseUrl}/api/wallet?action=export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context,
+          nonce: j1.nonce,
+        }),
+      });
+
+      const j2 = await r2.json();
+
+      if (!j2.ok) {
+        return res.status(200).json({ ok: false, error: "Export failed: " + (j2.error || "Unknown error") });
+      }
+
+      return res.status(200).json({ 
+        ok: true, 
+        reply: "⚠️ PRIVATE KEY (save it safely)\n\n" + j2.privateKey,
+        isSensitive: true
+      });
+    }
+
+    const message = String(body.message || "").trim();
     const coingecko = body.coingecko ?? null;
     const history = Array.isArray(body.history) ? body.history : [];
     const memory = body.memory ?? null;
@@ -306,10 +341,6 @@ export default async function handler(req, res) {
       (context && context.fid && `fc:${context.fid}`) ||
       (context && context.address && `addr:${String(context.address).toLowerCase()}`) ||
       "anon";
-
-    if (!userId || String(userId).trim() === "" || userId === "anon") {
-      // Biarkan AI menangani atau return early jika diperlukan
-    }
 
     const fid = context && context.fid ? String(context.fid) : null;
     const username = context && context.farcasterUsername ? String(context.farcasterUsername) : null;
@@ -411,8 +442,6 @@ export default async function handler(req, res) {
     const address = (context && typeof context === "object" && context.address) || null;
 
     if (isScanCommand) {
-      const address = scanAddress;
-
       const farcasterUsername = (context && context.farcasterUsername) || null;
       const neynarScoreRaw = context && context.neynarScore !== undefined ? context.neynarScore : null;
       const balanceEthRaw = context && context.balanceEth !== undefined ? context.balanceEth : null;
