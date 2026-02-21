@@ -316,9 +316,12 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: false, error: "Export failed: " + (j2.error || "Unknown error") });
       }
 
+      const secret = j2.type === "mnemonic" ? j2.mnemonic : j2.privateKey;
+      const label = j2.type === "mnemonic" ? "MNEMONIC PHRASE" : "PRIVATE KEY";
+
       return res.status(200).json({ 
         ok: true, 
-        reply: "⚠️ PRIVATE KEY (save it safely)\n\n" + j2.privateKey,
+        reply: `⚠️ ${label} (save it securely)\n\n${secret}`,
         isSensitive: true
       });
     }
@@ -368,11 +371,11 @@ export default async function handler(req, res) {
 
     if (/^(wallet|mywallet|address)\b/i.test(message)) {
       const r = await fetch(
-        `${baseUrl}/api/ai-wallet?userId=${encodeURIComponent(userId)}`
+        `${baseUrl}/api/ai-wallet?action=me&context=${encodeURIComponent(JSON.stringify(context))}`
       );
       const j = await r.json().catch(() => null);
 
-      if (!j || !j.ok) {
+      if (!j || !j.ok || !j.hasWallet) {
         return res.status(200).json({
           ok: true,
           reply: "Failed to load AI wallet.",
@@ -381,7 +384,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         ok: true,
-        reply: `🤖 AI Wallet\n${j.address}\n(created: ${j.created ? "yes" : "no"})`,
+        reply: `🤖 AI Wallet\n${j.address}\n(created: yes)`,
       });
     }
 
@@ -629,54 +632,54 @@ export default async function handler(req, res) {
       }
 
       if (message.toLowerCase() === "export") {
-  if (!context || context.__verifiedUser !== true || !context.fid) {
-    return res.status(200).json({
-      ok: true,
-      reply: "User not verified. Please verify by loading your Farcaster profile.",
-    });
-  }
+        if (!context || context.__verifiedUser !== true || !context.fid) {
+          return res.status(200).json({
+            ok: true,
+            reply: "User not verified. Please verify by loading your Farcaster profile.",
+          });
+        }
 
-  // 1. nonce
-  const r1 = await fetch(
-    `${baseUrl}/api/ai-wallet?action=export_nonce&context=${encodeURIComponent(
-      JSON.stringify(context)
-    )}`
-  );
-  const j1 = await r1.json().catch(() => null);
+        const r1 = await fetch(
+          `${baseUrl}/api/ai-wallet?action=export_nonce&context=${encodeURIComponent(
+            JSON.stringify(context)
+          )}`
+        );
+        const j1 = await r1.json().catch(() => null);
 
-  if (!j1 || !j1.ok) {
-    return res.status(200).json({
-      ok: true,
-      reply: "Failed to start export process.",
-    });
-  }
+        if (!j1 || !j1.ok) {
+          return res.status(200).json({
+            ok: true,
+            reply: "Failed to start export process.",
+          });
+        }
 
-  // 2. export private key
-  const r2 = await fetch(`${baseUrl}/api/ai-wallet?action=export`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      context,
-      nonce: j1.nonce,
-    }),
-  });
+        const r2 = await fetch(`${baseUrl}/api/ai-wallet?action=export`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context,
+            nonce: j1.nonce,
+          }),
+        });
 
-  const j2 = await r2.json().catch(() => null);
+        const j2 = await r2.json().catch(() => null);
 
-  if (!j2 || !j2.ok) {
-    return res.status(200).json({
-      ok: true,
-      reply: "Export failed.",
-    });
-  }
+        if (!j2 || !j2.ok) {
+          return res.status(200).json({
+            ok: true,
+            reply: "Export failed.",
+          });
+        }
 
-  return res.status(200).json({
-    ok: true,
-    reply:
-      "⚠️ PRIVATE KEY (save it securely)\n\n" +
-      (j2.privateKey || ""),
-  });
-} 
+        const secret = j2.type === "mnemonic" ? j2.mnemonic : j2.privateKey;
+        const label = j2.type === "mnemonic" ? "MNEMONIC PHRASE" : "PRIVATE KEY";
+
+        return res.status(200).json({
+          ok: true,
+          reply: `⚠️ ${label} (save it securely)\n\n${secret}`,
+          isSensitive: true
+        });
+      } 
     }
 
     if (!GEMINI_KEYS.length) {
