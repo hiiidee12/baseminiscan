@@ -385,52 +385,17 @@ export default async function handler(req, res) {
          });
       }
 
-      console.log("Sending multisend:", { userId, recipients });
-
-      const r = await fetch(`${baseUrl}/api/ai-multisend-stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, recipients }),
-      });
-
-      if (!r.ok) {
-        const errText = await r.text();
-        console.error("Multisend API Error:", r.status, errText);
-        return res.status(200).json({
-          ok: true,
-          reply: `Send failed: Server error ${r.status}. ${errText.slice(0, 100)}`
-        });
-      }
-
-      const j = await r.json().catch((e) => {
-        console.error("JSON Parse Error:", e);
-        return null;
-      });
-
-      if (!j || !j.ok) {
-        return res.status(200).json({
-          ok: true,
-          reply: `Send failed: ${j?.error || "unknown error"}`,
-        });
-      }
-
-      const lines = [];
-      lines.push(`🚀 Multisend executed`);
-      lines.push(`From: ${j.from}`);
-      lines.push(`Count: ${j.count}`);
-
-      for (const it of j.results || []) {
-        if (it.status === 'success') {
-           lines.push(`→ ${it.to} (${it.amount} ETH)`);
-           lines.push(`Tx: ${it.hash}`);
-        } else {
-           lines.push(`❌ Failed → ${it.to}: ${it.error}`);
-        }
-      }
+      console.log("Resolved recipients for stream:", { userId, recipients });
 
       return res.status(200).json({
         ok: true,
-        reply: lines.join("\n"),
+        action: "EXECUTE_MULTISEND_STREAM",
+        payload: {
+          userId,
+          recipients: recipients,
+          amountEth: recipients[0].amountEth
+        },
+        reply: `Memproses pengiriman ke ${recipients.length} alamat...`
       });
     }
 
