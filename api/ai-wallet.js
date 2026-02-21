@@ -3,8 +3,12 @@ export const config = { runtime: "nodejs" };
 import crypto from "crypto";
 import { kv } from "@vercel/kv";
 import { Wallet } from "ethers";
-import { encrypt, decrypt, loadWallet, saveWallet } from "../../lib/walletStore";
-import { requireVerifiedUser, isValidPrivateKey, privateKeyToAddress } from "../../lib/utils";
+import { encrypt, decrypt, loadWallet, saveWallet } from "../lib/walletStore";
+import {
+  requireVerifiedUser,
+  isValidPrivateKey,
+  privateKeyToAddress,
+} from "../lib/utils";
 
 const logError = (msg, err) => {
   console.error(`[WalletAPI] ${msg}:`, err?.message || err);
@@ -15,25 +19,15 @@ function makeNonce() {
 }
 
 function parseContextFromQuery(req) {
-  if (!req?.query?.context) return null;
-  const raw = String(req.query.context);
-
-  try {
-    const decoded = decodeURIComponent(raw);
-    return JSON.parse(decoded);
-  } catch {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
+  if (!req.query.context) return null;
+  const rawContext = decodeURIComponent(req.query.context);
+  return JSON.parse(rawContext);
 }
 
 function safeDecrypt(saved) {
   try {
     return decrypt(saved);
-  } catch {
+  } catch (e) {
     return null;
   }
 }
@@ -64,25 +58,6 @@ function deriveAddressFromData(data) {
   return null;
 }
 
-function derivePrivateKeyFromData(data) {
-  if (!data || typeof data !== "object") return null;
-
-  if (typeof data.privateKey === "string" && data.privateKey.trim()) {
-    return data.privateKey.trim();
-  }
-
-  if (typeof data.mnemonic === "string" && data.mnemonic.trim()) {
-    try {
-      const w = Wallet.fromPhrase(data.mnemonic.trim());
-      return typeof w.privateKey === "string" && w.privateKey.trim() ? w.privateKey.trim() : null;
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-}
-
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -90,31 +65,13 @@ export default async function handler(req, res) {
   try {
     const action = String(req.query.action || "").toLowerCase();
 
-    if (!action && req.method === "GET") {
-      const userId = String(req.query.userId || "").trim();
-      if (!userId) return res.status(400).json({ ok: false, error: "Missing userId" });
-
-      try {
-        const saved = await loadWallet(userId);
-        if (!saved) return res.status(200).json({ ok: true, address: null, created: false });
-
-        const data = safeDecrypt(saved);
-        const address = deriveAddressFromData(data);
-
-        return res.status(200).json({ ok: true, address: address || null, created: false });
-      } catch (err) {
-        logError("Legacy GET load failed", err);
-        return res.status(500).json({ ok: false, error: "Failed to load wallet" });
-      }
-    }
-
     if (action === "create" && req.method === "POST") {
       const { context } = req.body || {};
 
       let user;
       try {
         user = requireVerifiedUser(context);
-      } catch {
+      } catch (err) {
         return res.status(401).json({ ok: false, error: "Unauthorized" });
       }
 
@@ -124,21 +81,28 @@ export default async function handler(req, res) {
         if (saved) {
           const data = safeDecrypt(saved);
           const address = deriveAddressFromData(data);
-          return res.status(200).json({ ok: true, address: address || null, created: false });
+          return res.status(200).json({
+            ok: true,
+            address: address || null,
+            created: false,
+          });
         }
 
         const wallet = Wallet.createRandom();
-        const mnemonic = wallet?.mnemonic?.phrase ? String(wallet.mnemonic.phrase) : null;
 
         const payload = encrypt({
           address: wallet.address,
-          mnemonic,
+          mnemonic: wallet.mnemonic?.phrase,
           createdAt: Date.now(),
         });
 
         await saveWallet(user.userId, payload);
 
-        return res.status(200).json({ ok: true, address: wallet.address, created: true });
+        return res.status(200).json({
+          ok: true,
+          address: wallet.address,
+          created: true,
+        });
       } catch (err) {
         logError("Create wallet failed", err);
         return res.status(500).json({ ok: false, error: "Failed to create" });
@@ -164,7 +128,7 @@ export default async function handler(req, res) {
         const address = privateKeyToAddress(privateKey);
         if (!address) throw new Error("Failed to derive address");
 
-        const payload = encrypt({ address, privateKey: String(privateKey).trim(), importedAt: Date.now() });
+        const payload = encrypt({ address, privateKey, importedAt: Date.now() });
         await saveWallet(user.userId, payload);
 
         return res.status(200).json({ ok: true, address });
@@ -175,19 +139,25 @@ export default async function handler(req, res) {
     }
 
     if (action === "me" && req.method === "GET") {
-      const context = parseContextFromQuery(req);
-      if (!context) return res.status(400).json({ ok: false, error: "Invalid context format" });
+      let context = null;
+      try {
+        context = parseContextFromQuery(req);
+      } catch (e) {
+        return res.status(400).json({ ok: false, error: "Invalid context format" });
+      }
 
       let user;
       try {
         user = requireVerifiedUser(context);
-      } catch {
+      } catch (err) {
         return res.status(401).json({ ok: false, error: "Unauthorized" });
       }
 
       try {
         const saved = await loadWallet(user.userId);
-        if (!saved) return res.status(200).json({ ok: true, hasWallet: false });
+        if (!saved) {
+          return res.status(200).json({ ok: true, hasWallet: false });
+        }
 
         const data = safeDecrypt(saved);
         const address = deriveAddressFromData(data);
@@ -200,13 +170,17 @@ export default async function handler(req, res) {
     }
 
     if (action === "export_nonce" && req.method === "GET") {
-      const context = parseContextFromQuery(req);
-      if (!context) return res.status(400).json({ ok: false, error: "Invalid context format" });
+      let context = null;
+      try {
+        context = parseContextFromQuery(req);
+      } catch (e) {
+        return res.status(400).json({ ok: false, error: "Invalid context format" });
+      }
 
       let user;
       try {
         user = requireVerifiedUser(context);
-      } catch {
+      } catch (err) {
         return res.status(401).json({ ok: false, error: "Unauthorized" });
       }
 
@@ -226,7 +200,7 @@ export default async function handler(req, res) {
       let user;
       try {
         user = requireVerifiedUser(context);
-      } catch {
+      } catch (err) {
         return res.status(401).json({ ok: false, error: "Unauthorized" });
       }
 
@@ -239,29 +213,31 @@ export default async function handler(req, res) {
         await kv.del(`bms:wallet:export_nonce:${user.userId}`);
 
         const saved = await loadWallet(user.userId);
-        if (!saved) return res.status(404).json({ ok: false, error: "Wallet not found" });
-
-        const data = safeDecrypt(saved);
-        if (!data) return res.status(500).json({ ok: false, error: "Failed to decrypt wallet" });
-
-        const mnemonic = typeof data.mnemonic === "string" && data.mnemonic.trim() ? data.mnemonic.trim() : null;
-        const privateKey = derivePrivateKeyFromData(data);
-
-        if (mnemonic) {
-          return res.status(200).json({
-            ok: true,
-            type: "mnemonic",
-            mnemonic,
-            privateKey: privateKey || null,
-          });
+        if (!saved) {
+          return res.status(404).json({ ok: false, error: "Wallet not found" });
         }
 
+        const data = safeDecrypt(saved);
+        if (!data) {
+          return res.status(500).json({ ok: false, error: "Failed to decrypt wallet" });
+        }
+
+        const mnemonic =
+          typeof data.mnemonic === "string" && data.mnemonic.trim()
+            ? data.mnemonic.trim()
+            : null;
+
+        if (mnemonic) {
+          return res.status(200).json({ ok: true, type: "mnemonic", mnemonic });
+        }
+
+        const privateKey =
+          typeof data.privateKey === "string" && data.privateKey.trim()
+            ? data.privateKey.trim()
+            : null;
+
         if (privateKey) {
-          return res.status(200).json({
-            ok: true,
-            type: "privateKey",
-            privateKey,
-          });
+          return res.status(200).json({ ok: true, type: "privateKey", privateKey });
         }
 
         return res.status(404).json({ ok: false, error: "No key stored" });
@@ -277,4 +253,4 @@ export default async function handler(req, res) {
     logError("Global handler error", globalErr);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
-    }
+}
