@@ -9,7 +9,6 @@ import {
 const logError = (msg, err) => {
   console.error(`[WalletAPI] ${msg}:`, err?.message || err);
 };
-
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('X-Content-Type-Options', 'nosniff');
