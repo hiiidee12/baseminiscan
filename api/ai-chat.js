@@ -612,7 +612,7 @@ export default async function handler(req, res) {
 
     const cgText = __buildCoinGeckoText(coingecko);
 
-    const systemText = `
+    let systemText = `
 You are a wallet AI agent.
 Always respond in the same language as the user.
 Keep answers short, clear, and non-hype.
