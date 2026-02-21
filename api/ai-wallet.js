@@ -64,12 +64,49 @@ function deriveAddressFromData(data) {
   return null;
 }
 
+function derivePrivateKeyFromData(data) {
+  if (!data || typeof data !== "object") return null;
+
+  if (typeof data.privateKey === "string" && data.privateKey.trim()) {
+    return data.privateKey.trim();
+  }
+
+  if (typeof data.mnemonic === "string" && data.mnemonic.trim()) {
+    try {
+      const w = Wallet.fromPhrase(data.mnemonic.trim());
+      return typeof w.privateKey === "string" && w.privateKey.trim() ? w.privateKey.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("X-Content-Type-Options", "nosniff");
 
   try {
     const action = String(req.query.action || "").toLowerCase();
+
+    if (!action && req.method === "GET") {
+      const userId = String(req.query.userId || "").trim();
+      if (!userId) return res.status(400).json({ ok: false, error: "Missing userId" });
+
+      try {
+        const saved = await loadWallet(userId);
+        if (!saved) return res.status(200).json({ ok: true, address: null, created: false });
+
+        const data = safeDecrypt(saved);
+        const address = deriveAddressFromData(data);
+
+        return res.status(200).json({ ok: true, address: address || null, created: false });
+      } catch (err) {
+        logError("Legacy GET load failed", err);
+        return res.status(500).json({ ok: false, error: "Failed to load wallet" });
+      }
+    }
 
     if (action === "create" && req.method === "POST") {
       const { context } = req.body || {};
@@ -208,11 +245,24 @@ export default async function handler(req, res) {
         if (!data) return res.status(500).json({ ok: false, error: "Failed to decrypt wallet" });
 
         const mnemonic = typeof data.mnemonic === "string" && data.mnemonic.trim() ? data.mnemonic.trim() : null;
-        if (mnemonic) return res.status(200).json({ ok: true, type: "mnemonic", mnemonic });
+        const privateKey = derivePrivateKeyFromData(data);
 
-        const privateKey =
-          typeof data.privateKey === "string" && data.privateKey.trim() ? data.privateKey.trim() : null;
-        if (privateKey) return res.status(200).json({ ok: true, type: "privateKey", privateKey });
+        if (mnemonic) {
+          return res.status(200).json({
+            ok: true,
+            type: "mnemonic",
+            mnemonic,
+            privateKey: privateKey || null,
+          });
+        }
+
+        if (privateKey) {
+          return res.status(200).json({
+            ok: true,
+            type: "privateKey",
+            privateKey,
+          });
+        }
 
         return res.status(404).json({ ok: false, error: "No key stored" });
       } catch (err) {
@@ -227,4 +277,4 @@ export default async function handler(req, res) {
     logError("Global handler error", globalErr);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
-}
+    }
