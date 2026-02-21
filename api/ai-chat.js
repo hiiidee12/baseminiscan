@@ -627,6 +627,56 @@ export default async function handler(req, res) {
           reply: "Type: `scan 0x...` to see wallet summary.",
         });
       }
+
+      if (message.toLowerCase() === "export") {
+  if (!context || context.__verifiedUser !== true || !context.fid) {
+    return res.status(200).json({
+      ok: true,
+      reply: "User not verified. Please verify by loading your Farcaster profile.",
+    });
+  }
+
+  // 1. nonce
+  const r1 = await fetch(
+    `${baseUrl}/api/wallet?action=export_nonce&context=${encodeURIComponent(
+      JSON.stringify(context)
+    )}`
+  );
+  const j1 = await r1.json().catch(() => null);
+
+  if (!j1 || !j1.ok) {
+    return res.status(200).json({
+      ok: true,
+      reply: "Failed to start export process.",
+    });
+  }
+
+  // 2. export private key
+  const r2 = await fetch(`${baseUrl}/api/wallet?action=export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      context,
+      nonce: j1.nonce,
+    }),
+  });
+
+  const j2 = await r2.json().catch(() => null);
+
+  if (!j2 || !j2.ok) {
+    return res.status(200).json({
+      ok: true,
+      reply: "Export failed.",
+    });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    reply:
+      "⚠️ PRIVATE KEY (save it securely)\n\n" +
+      (j2.privateKey || ""),
+  });
+} 
     }
 
     if (!GEMINI_KEYS.length) {
