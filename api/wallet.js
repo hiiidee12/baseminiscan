@@ -1,3 +1,4 @@
+export const config = { runtime: 'nodejs', };
 import { encrypt, decrypt, loadWallet, saveWallet } from "../../lib/walletstore";
 import {
   requireVerifiedUser,
