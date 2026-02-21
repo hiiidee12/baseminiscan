@@ -76,7 +76,7 @@ function __startMultisendStream({ userId, amountEth, toList }) {
 
   es.addEventListener("start", (e) => {
     const d = JSON.parse(e.data);
-    __aiAdd("assistant", `🚀 Multisend started\nFrom: ${d.from}\nCount: ${d.count}`);
+    __aiAdd("assistant", `🚀 Send started\nFrom: ${d.from}\nCount: ${d.count}`);
   });
 
   es.addEventListener("sending", (e) => {
@@ -439,13 +439,40 @@ async function __aiSendNow() {
     });
 
     const j = await r.json().catch(() => null);
+    
     if (!r.ok || !j?.ok) throw j;
+
+    if (j.action === "EXECUTE_MULTISEND_STREAM" && j.payload) {
+      __aiMessages.splice(thinkingIndex, 1);
+      __aiRender();
+
+      const { userId, recipients, amountEth } = j.payload;
+      const toListArray = recipients.map(r => r.to);
+
+      const es = __startMultisendStream({
+        userId,
+        amountEth,
+        toList: toListArray
+      });
+
+      const __done = () => {
+        __aiBusy = false;
+        if (btn) btn.disabled = false;
+        input.disabled = false;
+        input.focus();
+      };
+
+      es.addEventListener("done", __done);
+      es.addEventListener("error", __done);
+      return;
+    }
 
     __aiMessages[thinkingIndex] = {
       role: "assistant",
       text: String(j.reply || "Data not available.").trim(),
     };
     __aiRender();
+
   } catch {
     __aiMessages[thinkingIndex] = {
       role: "assistant",
