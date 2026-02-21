@@ -4,7 +4,7 @@ import {
   requireVerifiedUser,
   isValidPrivateKey,
   privateKeyToAddress,
-} from "../../lib/utils";
+} from "../lib/utils";
 
 const logError = (msg, err) => {
   console.error(`[WalletAPI] ${msg}:`, err?.message || err);
