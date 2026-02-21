@@ -186,8 +186,8 @@ export default async function handler(req, res) {
 
       try {
         const nonce = makeNonce();
-        await kv.set(`bms:wallet:export_nonce:${user.userId}`, nonce, { ex: 60 });
-        return res.status(200).json({ ok: true, nonce, ttlSec: 60 });
+        await kv.set(`bms:wallet:export_nonce:${user.userId}`, nonce, { ex: 300 });
+        return res.status(200).json({ ok: true, nonce, ttlSec: 300 });
       } catch (err) {
         logError("Export nonce failed", err);
         return res.status(500).json({ ok: false, error: "Failed to create nonce" });
