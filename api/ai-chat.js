@@ -14,7 +14,7 @@ function pickGeminiKey() {
 async function callGeminiWithRotation({ model, input, instructions, temperature, maxOutputTokens }) {
   if (!GEMINI_KEYS.length) return { ok: false, status: 0, json: null };
 
-  const url = "https://openrouter.ai/api/v1/chat/completions";
+  const url = "https://openrouter.ai/api/v1/chat/completions ";
 
   let last = { ok: false, status: 0, json: null };
 
@@ -290,7 +290,6 @@ export default async function handler(req, res) {
     const cmd = body.cmd;
     const context = body.context ?? null;
 
-
     const message = String(body.message || "").trim();
     const coingecko = body.coingecko ?? null;
     const history = Array.isArray(body.history) ? body.history : [];
@@ -310,28 +309,8 @@ export default async function handler(req, res) {
       (context && context.address && `addr:${String(context.address).toLowerCase()}`) ||
       "anon";
 
-    const fid = context && context.fid ? String(context.fid) : null;
-    const username = context && context.farcasterUsername ? String(context.farcasterUsername) : null;
-    const neynarScore =
-      context && context.neynarScore !== undefined && context.neynarScore !== null
-        ? String(context.neynarScore)
-        : null;
-
-    if (/^(who am i|siapa saya)\b/i.test(message)) {
-      const lines = [];
-      if (fid) lines.push(`FID: ${fid}`);
-      if (username) lines.push(`Username: @${username}`);
-      if (neynarScore) lines.push(`Neynar: ${neynarScore}`);
-      if (!lines.length) lines.push("Data not available.");
-      return res.status(200).json({ ok: true, reply: lines.join("\n") });
-    }
-
-    if (/(neynar|score)\b/i.test(message) && neynarScore) {
-      return res.status(200).json({ ok: true, reply: `Neynar: ${neynarScore}` });
-    }
-
-    if (/\bfid\b/i.test(message) && fid) {
-      return res.status(200).json({ ok: true, reply: `FID: ${fid}` });
+    if (/(neynar|score)\b/i.test(message) && context && context.neynarScore !== undefined && context.neynarScore !== null) {
+      return res.status(200).json({ ok: true, reply: `Neynar: ${context.neynarScore}` });
     }
 
     if (/^(wallet|mywallet|address)\b/i.test(message)) {
@@ -623,7 +602,7 @@ DATA RULES
 IDENTITY / VERIFICATION
 - Treat user as VERIFIED only if context.__verifiedUser === true AND context.fid exists.
 - If NOT verified, you must NOT help execute transactions, reveal sensitive wallet actions, or give step-by-step operational transfer instructions.
-- If user asks "who am I", "my fid", "my score", answer using context (if present).
+- If user asks about reputation/score, reference context.neynarScore briefly.
 
 WALLET ACTIONS
 - If user requests send/multisend/transfer AND verified:
