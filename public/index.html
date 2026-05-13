@@ -26,8 +26,8 @@
 
       <!-- Mode Tabs -->
       <div class="topTabs">
-        <button id="tabHomeTop" class="topTab">Home</button>
-        <button id="tabAiTop" class="topTab secondary">AI Mode</button>
+        <button id="tabHomeTop" class="topTab">Explorer</button>
+        <button id="tabAiTop" class="topTab secondary">AI</button>
       </div>
 
       <!-- Profile -->
@@ -50,7 +50,7 @@
         <div class="row">
           <input
             id="query"
-            placeholder="Paste address / tx hash / block number"
+            placeholder="Search address, tx hash, or block..."
             autocomplete="off"
           />
           <button id="open">Search</button>
@@ -58,7 +58,7 @@
 
         <div class="sectionHead">
           <div class="sectionTitle">Gas Tracker</div>
-          <div class="muted gasNext" id="gasNext">Next update in <b>--</b></div>
+          <div class="muted gasNext" id="gasNext">Next in <b>--</b></div>
         </div>
 
         <div id="gasOutput"></div>
@@ -68,7 +68,7 @@
 
       <!-- AI -->
       <section id="pageAi" data-page="ai" style="display:none">
-        <div class="cardTitle" style="padding:0; margin-bottom:12px;">BMS AI</div>
+        <div class="cardTitle">AI Assistant</div>
 
         <div id="aiChat" class="aiChat"></div>
 
@@ -76,7 +76,7 @@
           <input
             id="aiInput"
             type="text"
-            placeholder="Paste address + ask something..."
+            placeholder="Ask about any address or transaction..."
             autocomplete="off"
           />
           <button id="aiSend">Send</button>
@@ -100,7 +100,7 @@
               <div class="fcUser" id="fcUserDetail">-</div>
             </div>
             <div class="statBox">
-              <div class="muted">ETH Balance</div>
+              <div class="muted">Balance</div>
               <div class="statValue" id="detailBalance">-</div>
             </div>
             <div class="statBox">
