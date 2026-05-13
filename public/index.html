@@ -16,6 +16,7 @@
   <meta name="twitter:description" content="Base Network explorer helper" />
   <meta name="twitter:image" content="https://baseminiscan.vercel.app/assets/spx.png" />
 
+  <link rel="icon" href="/icon.png" type="image/png" />
   <link rel="stylesheet" href="/app.css" />
 </head>
 
@@ -23,15 +24,17 @@
   <div class="wrap" id="wrap">
     <div class="card">
 
+      <!-- Mode Tabs -->
       <div class="topTabs">
-        <button id="tabHomeTop" class="topTab">HOME</button>
-        <button id="tabAiTop" class="topTab secondary">AI MODE</button>
+        <button id="tabHomeTop" class="topTab">Home</button>
+        <button id="tabAiTop" class="topTab secondary">AI Mode</button>
       </div>
 
+      <!-- Profile -->
       <div class="profile profileCard">
         <img id="pfp" class="pfp" alt="pfp" />
         <div class="profileInfo">
-          <div class="profileName" id="fcName">Loading…</div>
+          <div class="profileName" id="fcName">Loading...</div>
           <div class="profileUsername muted" id="fcUser">@-</div>
           <div class="profileBadges">
             <span class="badge" id="fcFid">FID: -</span>
@@ -50,22 +53,22 @@
             placeholder="Paste address / tx hash / block number"
             autocomplete="off"
           />
-          <button id="open">Open</button>
+          <button id="open">Search</button>
         </div>
 
         <div class="sectionHead">
-          <div class="sectionTitle">Base Gas Tracker ⛽</div>
-          <div class="muted gasNext" id="gasNext">Next update in <b>—</b></div>
+          <div class="sectionTitle">Gas Tracker</div>
+          <div class="muted gasNext" id="gasNext">Next update in <b>--</b></div>
         </div>
 
         <div id="gasOutput"></div>
-        <div id="featuredActions" class="featuredCard"></div>
+        <div id="featuredActions"></div>
         <div id="additionalInfo"></div>
       </section>
 
       <!-- AI -->
       <section id="pageAi" data-page="ai" style="display:none">
-        <div class="cardTitle">BMS AI</div>
+        <div class="cardTitle" style="padding:0; margin-bottom:12px;">BMS AI</div>
 
         <div id="aiChat" class="aiChat"></div>
 
@@ -73,7 +76,7 @@
           <input
             id="aiInput"
             type="text"
-            placeholder="Paste address + ask something…"
+            placeholder="Paste address + ask something..."
             autocomplete="off"
           />
           <button id="aiSend">Send</button>
@@ -83,17 +86,17 @@
       <!-- DETAIL -->
       <section id="pageDetail" data-page="detail" style="display:none">
         <div class="detailBar">
-          <button id="back" class="secondary backBtn">← Back</button>
+          <button id="back" class="secondary backBtn">Back</button>
           <div class="muted" id="link"></div>
         </div>
 
         <div class="detailHeader">
-          <div class="detailLabel muted">Wallet Address</div>
+          <div class="detailLabel">Wallet Address</div>
           <div class="detailAddress" id="detailAddress">-</div>
 
           <div class="detailStats">
             <div class="statBox">
-              <div class="muted">Farcaster Username</div>
+              <div class="muted">Farcaster</div>
               <div class="fcUser" id="fcUserDetail">-</div>
             </div>
             <div class="statBox">
@@ -101,17 +104,17 @@
               <div class="statValue" id="detailBalance">-</div>
             </div>
             <div class="statBox">
-              <div class="muted">Total Transactions</div>
+              <div class="muted">Transactions</div>
               <div class="statValue" id="detailTxCount">-</div>
             </div>
           </div>
         </div>
 
         <div class="tabs">
-          <button id="tabTx" class="secondary">Transactions</button>
-          <button id="tabErc20" class="secondary">ERC-20 Transfers</button>
+          <button id="tabTx" class="secondary">Txns</button>
+          <button id="tabErc20" class="secondary">ERC-20</button>
           <button id="tabInternal" class="secondary">Internal</button>
-          <button id="tabNft" class="secondary">NFT Transfers</button>
+          <button id="tabNft" class="secondary">NFT</button>
         </div>
 
         <div id="detailOutput"></div>

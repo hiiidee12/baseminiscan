@@ -1,54 +1,58 @@
+/* ============================================
+   Base Mini Scan — Minimalist Design System
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #141419;
+  --surface-2: #1c1c24;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --text: #f0f0f5;
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.12);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+}
+
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html, body {
-  margin: 0;
-  padding: 0;
   height: 100%;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  color: #fff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  background:
-    radial-gradient(900px 500px at 10% 10%, rgba(0,112,255,.55), transparent 40%),
-    radial-gradient(800px 500px at 90% 20%, rgba(80,160,255,.45), transparent 45%),
-    linear-gradient(180deg, #020617, #020b2a, #041e42);
-  background-size: 200% 200%;
-  animation: bgMove 18s ease-in-out infinite;
-}
-
-@keyframes bgMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
+/* =====================
+   LAYOUT
+===================== */
 
 .wrap {
   min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 20px;
 }
 
 .card {
   width: 100%;
-  max-width: 760px;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.28),
-    rgba(255,255,255,0.08)
-  );
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border-radius: 26px;
-  border: 1px solid rgba(255,255,255,0.35);
-  padding: 22px;
-  box-shadow:
-    0 30px 80px rgba(0,60,180,.45),
-    inset 0 1px 0 rgba(255,255,255,.45);
+  max-width: 680px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
   position: relative;
 }
 
@@ -60,46 +64,42 @@ body {
   display: flex;
   gap: 14px;
   align-items: center;
-  padding: 14px;
-  border-radius: 20px;
-  background: rgba(255,255,255,0.16);
-  border: 1px solid rgba(255,255,255,0.28);
-  backdrop-filter: blur(18px);
-  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
 }
 
 .pfp {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid transparent;
-  background:
-    linear-gradient(#000, #000) padding-box,
-    linear-gradient(135deg, #60a5fa, #2563eb, #7c3aed) border-box;
+  border: 2px solid var(--border);
 }
 
 .profileInfo {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
 .profileName {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .profileUsername {
   font-size: 13px;
-  margin-top: -2px;
+  color: var(--text-muted);
 }
 
 .profileBadges {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-top: 6px;
   flex-wrap: wrap;
 }
@@ -109,67 +109,19 @@ body {
 ===================== */
 
 .badge {
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  background: rgba(255,255,255,0.22);
-  border: 1px solid rgba(255,255,255,0.30);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .badge.neynar {
-  background: linear-gradient(135deg, #60a5fa, #2563eb, #7c3aed);
-  border: none;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
-}
-
-/* =========================
-   Internal Transactions
-========================= */
-
-.internalBadge {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #7c8cff, #3b82f6);
-  color: #fff;
-}
-
-.tableWrap.internal table th {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.tableWrap.internal table td {
-  font-size: 13px;
-}
-
-.tableWrap.internal .valueMinus {
-  color: #fb7185;
-  font-weight: 600;
-}
-
-.tableWrap.internal .valuePlus {
-  color: #4ade80;
-  font-weight: 600;
-}
-
-.tableWrap.internal .addr {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-/* active tab visual */
-#tabInternal:not(.secondary) {
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
-  color: #fff;
-}
-
-/* small helper */
-.internalNote {
-  margin-top: 8px;
-  font-size: 12px;
-  opacity: 0.7;
+  background: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+  border-color: rgba(139, 92, 246, 0.2);
 }
 
 /* =====================
@@ -177,129 +129,109 @@ body {
 ===================== */
 
 h1 {
-  font-size: 22px;
-  margin: 6px 0 12px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: -0.3px;
 }
 
 .row {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 input {
-  padding: 15px 16px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.28);
-  border: 1px solid rgba(255,255,255,0.4);
-  color: #fff;
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-size: 14px;
+  font-family: inherit;
   outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  border-color: var(--accent);
 }
 
 input::placeholder {
-  color: rgba(255,255,255,.65);
+  color: var(--text-muted);
 }
 
 button {
-  padding: 14px 16px;
-  border-radius: 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
   border: none;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
+  font-family: inherit;
   color: #fff;
   cursor: pointer;
-  background: linear-gradient(90deg, #1d4ed8, #2563eb, #3b82f6);
-  box-shadow:
-    0 14px 40px rgba(37,99,235,.65),
-    inset 0 1px 0 rgba(255,255,255,.35);
+  background: var(--accent);
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:active {
+  transform: scale(0.98);
 }
 
 button.secondary {
-  background: rgba(255,255,255,0.25);
-  box-shadow: none;
-  border: 1px solid rgba(255,255,255,.4);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+button.secondary:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
 }
 
 /* =====================
-   DETAIL - TOP BAR (Back floating)
+   TOP TABS
 ===================== */
 
-.detailTop {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  right: 14px;
+.topTabs {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 5;
-  pointer-events: none;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  border: 1px solid var(--border);
 }
 
-.backBtn {
-  pointer-events: auto;
-  padding: 10px 14px;
-  border-radius: 16px;
-  font-size: 13px;
-}
-
-#link {
-  display: none !important;
-}
-
-/* =====================
-   TABS
-===================== */
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-.tabs button {
+.topTabs .topTab {
   flex: 1;
-  min-width: 0;
-  padding: 8px 10px;
+  padding: 10px 16px;
   font-size: 13px;
-  border-radius: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-xs);
+  min-width: 0;
+}
+
+.topTabs .topTab:not(.secondary) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.topTabs .topTab.secondary {
+  background: transparent;
+  border: none;
+}
+
+body[data-page="detail"] .topTabs {
+  display: none;
 }
 
 /* =====================
-   CONTENT
-===================== */
-
-.muted {
-  font-size: 12px;
-  color: rgba(255,255,255,.7);
-}
-
-a {
-  color: #cfe1ff;
-  text-decoration: none;
-}
-
-.click {
-  cursor: pointer;
-  color: #cfe1ff;
-}
-
-.small {
-  font-size: 11px;
-  color: rgba(255,255,255,.7);
-}
-
-.resultCard {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(10,20,40,.65);
-  border: 1px solid rgba(255,255,255,.25);
-}
-
-/* =====================
-   HOME SECTION HEAD
+   SECTIONS
 ===================== */
 
 .sectionHead {
@@ -307,14 +239,114 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-top: 14px;
-  margin-bottom: 10px;
+  margin-top: 24px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
 .sectionTitle {
-  font-weight: 800;
-  letter-spacing: .2px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 16px 16px 0;
+  letter-spacing: -0.2px;
+}
+
+/* =====================
+   DETAIL - BACK BAR
+===================== */
+
+.detailTop {
+  display: none;
+}
+
+.detailBar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.backBtn {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: var(--radius-xs);
+}
+
+#link {
+  display: none !important;
+}
+
+body[data-page="detail"] .profile {
+  display: none;
+}
+
+/* =====================
+   TABS (detail)
+===================== */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+
+.tabs button {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 8px;
+  font-size: 12px;
+  border-radius: var(--radius-xs);
+}
+
+.tabs button:not(.secondary) {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* =====================
+   CONTENT / UTILITIES
+===================== */
+
+.muted {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.click {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.click:hover {
+  text-decoration: underline;
+}
+
+.small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.resultCard {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 /* =====================
@@ -322,43 +354,59 @@ a {
 ===================== */
 
 .detailHeader {
-  margin-top: 6px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(10,20,40,.65);
-  border: 1px solid rgba(255,255,255,.25);
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .detailLabel {
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   margin-bottom: 6px;
 }
 
 .detailAddress {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   word-break: break-all;
-  line-height: 1.25;
+  line-height: 1.4;
+  font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
 .detailStats {
-  margin-top: 12px;
+  margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
 .statBox {
   padding: 12px;
-  border-radius: 16px;
-  background: rgba(255,255,255,.12);
-  border: 1px solid rgba(255,255,255,.20);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.statBox .muted {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .statValue {
   margin-top: 6px;
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.fcUser {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 /* =====================
@@ -367,14 +415,14 @@ a {
 
 .tableWrap {
   margin-top: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,.25);
-  background: rgba(10,20,40,.7);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   overflow: hidden;
 }
 
 .tableScroll {
-  max-height: 360px;
+  max-height: 380px;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -385,22 +433,72 @@ table {
 }
 
 th, td {
-  padding: 10px;
+  padding: 10px 12px;
   text-align: left;
   font-size: 12px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
+  border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
 th {
   position: sticky;
   top: 0;
-  background: rgba(10,20,40,.85);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
   z-index: 1;
 }
 
 /* =====================
-   GAS
+   INTERNAL TX
+===================== */
+
+.internalBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.tableWrap.internal .valueMinus {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.tableWrap.internal .valuePlus {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.tableWrap.internal .addr {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+}
+
+#tabInternal:not(.secondary) {
+  background: var(--accent);
+  color: #fff;
+}
+
+#tabNft:not(.secondary) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.internalNote {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* =====================
+   GAS TRACKER
 ===================== */
 
 .gasWrap {
@@ -417,55 +515,70 @@ th {
 }
 
 .gasTitle {
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .gasNext {
   font-size: 12px;
-  opacity: .85;
+  color: var(--text-muted);
 }
 
 .gasGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .gasCard {
   padding: 14px;
-  border-radius: 18px;
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.28);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   text-align: center;
+}
+
+.gasLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .gasValue {
   font-size: 18px;
   font-weight: 800;
   margin: 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.gasValue .unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .gasSub {
   font-size: 11px;
-  opacity: .8;
+  color: var(--text-muted);
 }
 
 .gasInfoGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .gasInfoCard {
   padding: 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.28);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .gasInfoLabel {
   font-size: 11px;
-  opacity: .75;
+  color: var(--text-muted);
 }
 
 .gasInfoValue {
@@ -474,61 +587,23 @@ th {
 }
 
 /* =====================
-   RESPONSIVE
+   FEATURED ACTIONS
 ===================== */
 
-@media (max-width: 520px) {
-  .gasGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .detailStats {
-    grid-template-columns: 1fr;
-  }
-
-  button {
-    border-radius: 18px;
-  }
-}
-/* hide profile on detail page */
-body[data-page="detail"] .profile {
-  display: none;
+.featuredCard {
+  margin-top: 20px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
 }
 
-/* ===== Detail Top Bar ===== */
-.detailBar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-
-  display: flex;
-  align-items: center;
-
-  padding: 10px 12px;
-  margin-bottom: 12px;
-
-  background: rgba(10, 20, 40, 0.85);
-  backdrop-filter: blur(12px);
-  border-radius: 14px;
+.featuredCard .card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
-
-/* Back button lebih kecil & rapi */
-.backBtn {
-  padding: 8px 12px;
-  font-size: 13px;
-}
-.detailBar { border-radius: 14px; }
-body[data-page="detail"] .detailHeader { margin-top: 0; }
-
-/* NFT Tab Active Style */
-#tabNft:not(.secondary) {
-  background: linear-gradient(135deg, #60a5fa, #2563eb, #7c3aed);
-  color: #fff;
-}
-
-/* ===============================
-   Featured Actions Table
-   =============================== */
 
 .tbl {
   width: 100%;
@@ -537,14 +612,19 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
 
 .tbl th,
 .tbl td {
-  padding: 12px 10px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
 }
 
 .tbl th {
   text-align: left;
-  font-weight: 700;
-  opacity: .85;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  background: var(--surface);
 }
 
 .tbl .num {
@@ -552,271 +632,65 @@ body[data-page="detail"] .detailHeader { margin-top: 0; }
   font-variant-numeric: tabular-nums;
 }
 
+.tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+
 #featuredActions {
   margin-top: 20px;
 }
 
-.fcUser {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-top: 4px;
-  color: #fff;
-}
-
-/* === Profile Card Gradient Override === */
-.profileCard {
-  border-radius: 18px;
-  padding: 14px 16px;
-  color: #fff;
-
-  background: linear-gradient(
-    135deg,
-    #0b5cff,
-    #2f80ff,
-    #4fa3ff
-  );
-
-  background-size: 200% 200%;
-  animation: gradientMove 14s ease infinite;
-
-  box-shadow:
-    0 10px 30px rgba(0,0,0,.25),
-    inset 0 0 0 1px rgba(255,255,255,.12);
-}
-
-@keyframes gradientMove {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* === Profile Card: radial like background, but darker === */
-.profileCard{
-  position: relative;
-  overflow: hidden;
-
-  border-radius: 18px;
-  padding: 14px 16px;
-  color: #fff;
-
-  /* base */
-  background: rgba(10, 14, 28, .72);
-  border: 1px solid rgba(255,255,255,.12);
-
-  box-shadow:
-    0 10px 28px rgba(0,0,0,.30),
-    inset 0 0 0 1px rgba(255,255,255,.08);
-}
-
-/* radial glow */
-.profileCard::before{
-  content:"";
-  position:absolute;
-  inset:-60px;
-
-  background:
-    radial-gradient(circle at 18% 12%, rgba(11, 92, 255, 0.45), transparent 52%),
-    radial-gradient(circle at 85% 88%, rgba(79, 163, 255, 0.28), transparent 56%),
-    radial-gradient(circle at 55% 35%, rgba(47, 128, 255, 0.16), transparent 62%);
-
-  opacity: .95;
-  pointer-events:none;
-}
-
-/* */
-.profileCard::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  background: rgba(255,255,255,.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  pointer-events:none;
-}
-
-/* pastikan konten di atas overlay */
-.profileCard > *{
-  position: relative;
-  z-index: 1;
-}
-
-/* === Featured Actions: same gradient style as profile, but softer === */
-.featuredCard{
-  position: relative;
-  overflow: hidden;
-
-  border-radius: 18px;
-  color: #fff;
-
-  /* base glass */
-  background: rgba(10, 14, 28, .62);
-  border: 1px solid rgba(255,255,255,.12);
-
-  box-shadow:
-    0 10px 26px rgba(0,0,0,.26),
-    inset 0 0 0 1px rgba(255,255,255,.06);
-}
-
-/* */
-.featuredCard::before{
-  content:"";
-  position:absolute;
-  inset:-80px;
-
-  background:
-    radial-gradient(circle at 20% 15%, rgba(11, 92, 255, 0.32), transparent 55%),
-    radial-gradient(circle at 85% 85%, rgba(79, 163, 255, 0.20), transparent 60%),
-    radial-gradient(circle at 55% 40%, rgba(47, 128, 255, 0.12), transparent 65%);
-
-  opacity: .9;
-  pointer-events:none;
-}
-
-/* glass overlay tipis */
-.featuredCard::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  background: rgba(255,255,255,.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  pointer-events:none;
-}
-
-/* pastikan isi table di atas gradient */
-.featuredCard > *{
-  position: relative;
-  z-index: 1;
-}
-
-/* === Main container (glass card) === */
-.card{
-  position: relative;
-  overflow: hidden;
-}
-
-/* soft featured-like gradient */
-.card::before{
-  content:"";
-  position:absolute;
-  inset:-160px;
-
-  background:
-    radial-gradient(circle at 22% 12%, rgba(47,128,255,.10), transparent 55%),
-    radial-gradient(circle at 85% 90%, rgba(79,163,255,.06), transparent 60%);
-
-  opacity:.85;
-  pointer-events:none;
-}
-
-.card > *{
-  position: relative;
-  z-index: 1;
-}
-
-/* === Fix: Featured Actions corners bleeding === */
-.featuredCard{
-  position: relative;
-  border-radius: 18px;
-  overflow: hidden;          
-  isolation: isolate;        
-}
-
-/
-.featuredCard::before{
-  content:"";
-  position:absolute;
-  inset: 0;                  
-  border-radius: inherit;    
-  pointer-events:none;
-
-  background:
-    radial-gradient(circle at 20% 15%, rgba(11, 92, 255, 0.32), transparent 55%),
-    radial-gradient(circle at 85% 85%, rgba(79, 163, 255, 0.20), transparent 60%),
-    radial-gradient(circle at 55% 40%, rgba(47, 128, 255, 0.12), transparent 65%);
-
-  opacity: .9;
-}
-
-/* */
-.featuredCard::after{
-  content:"";
-  position:absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events:none;
-
-  background: rgba(255,255,255,.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-/*  */
-.featuredCard > *{
-  position: relative;
-  z-index: 1;
-}
-
-.topTabs{
-  display:flex;
-  justify-content:center;
-  gap:12px;
-  margin:12px 0 14px;
-  padding:0 4px;
-}
-
-.topTabs .topTab{
-  min-width:120px;
-  padding:0 18px;
-}
-
-/* hide HOME / AI MODE on detail page */
-body[data-page="detail"] .topTabs{
-  display:none;
-}
-
-/* =========================
-   AI Mode
-========================= */
+/* =====================
+   AI MODE
+===================== */
 
 .aiChat {
   margin-top: 12px;
-  height: 520px;
+  height: 480px;
   overflow: auto;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(0,0,0,.18);
-  border: 1px solid rgba(255,255,255,.10);
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
 }
+
 .aiMsg {
   display: flex;
-  margin: 10px 0;
+  margin: 8px 0;
 }
 
-.aiMsg.user { justify-content: flex-end; }
-.aiMsg.assistant { justify-content: flex-start; }
+.aiMsg.user {
+  justify-content: flex-end;
+}
+
+.aiMsg.assistant {
+  justify-content: flex-start;
+}
 
 .aiBubble {
-  max-width: 85%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  line-height: 1.35;
-  font-size: 14px;
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  line-height: 1.45;
+  font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.10);
 }
 
 .aiMsg.user .aiBubble {
-  background: rgba(80,140,255,.22);
+  background: var(--accent);
+  color: #fff;
+}
+
+.aiMsg.assistant .aiBubble {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .aiComposer {
   margin-top: 12px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -824,17 +698,59 @@ body[data-page="detail"] .topTabs{
   flex: 1;
 }
 
-/* Hide profile card in AI mode */
 body[data-page="ai"] .profileCard {
   display: none;
 }
 
-.cardTitle {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  margin-top: 6px;
-  margin-bottom: 10px;
-  color: #ffffff;
+/* =====================
+   SKELETON LOADING
+===================== */
+
+.skeleton .sk-line {
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 8px 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.sk-line.w30 { width: 30%; }
+.sk-line.w40 { width: 40%; }
+.sk-line.w50 { width: 50%; }
+.sk-line.w60 { width: 60%; }
+.sk-line.w70 { width: 70%; }
+.sk-line.w80 { width: 80%; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* =====================
+   RESPONSIVE
+===================== */
+
+@media (max-width: 520px) {
+  .wrap {
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  .card {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .gasGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .detailStats {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs button {
+    font-size: 11px;
+    padding: 7px 6px;
+  }
 }
